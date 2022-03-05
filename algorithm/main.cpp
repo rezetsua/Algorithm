@@ -6,6 +6,8 @@
 #include <opencv2/video.hpp>
 #include <opencv2/optflow.hpp>
 
+#include <cmath>
+
 using namespace cv;
 using namespace std;
 
@@ -53,16 +55,27 @@ int lucas_kanade(const string& filename, bool save)
          */
         calcOpticalFlowPyrLK(old_gray, frame_gray, p0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
         vector<Point2f> good_new;
+        int count = 0;
+        //cout << "size " << p0.size() << endl;
         for(uint i = 0; i < p0.size(); i++)
         {
             // Select good points
-            if(status[i] == 1) {
-                good_new.push_back(p1[i]);
-                // draw the tracks
-                line(mask,p1[i], p0[i], colors[i], 2);
-                circle(frame, p1[i], 5, colors[i], -1);
+            if (status[i] == 0)
+                continue;
+            good_new.push_back(p1[i]);
+            float deltaX = abs(p1[i].x - p0[i].x);
+            float deltaY = abs(p1[i].y - p0[i].y);
+            //cout << "deltaX " << deltaX << "deltaY " << deltaY << endl;
+            // draw the tracks
+            float treahold = 0.2;
+            if (deltaX < treahold && deltaY < treahold) {
+                count++;
+                continue;
             }
+            line(mask,p1[i], p0[i], colors[i], 2);
+            circle(frame, p1[i], 5, colors[i], -1);
         }
+        //cout << "count" << count << endl;
         Mat img;
         add(frame, mask, img);
         imshow("flow", img);
