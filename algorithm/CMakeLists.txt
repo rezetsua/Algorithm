@@ -10,6 +10,6 @@ FIND_PACKAGE(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 link_directories(${OpenCV_LIBRARY_DIR})
 
-add_executable(algorithm main.cpp)
+add_executable(algorithm main.cpp tracker.cpp tracker.h)
 
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES})
