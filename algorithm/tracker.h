@@ -7,7 +7,6 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/video.hpp>
-#include <opencv2/optflow.hpp>
 
 #include <cmath>
 
@@ -41,6 +40,8 @@ private:
     void filterAndDrawPoint();
     bool showResult();
     void setDetector(int detector_enum);
+    void detectNewPoint(Mat &frame, int freq);
+    void fillPointMat(int blockSize);
 
 private:
     bool running;
@@ -55,7 +56,9 @@ private:
     vector<Scalar> colors;
     vector<Point2f> p0;
     vector<Point2f> p1;
+    vector<KeyPoint> new_point;
     vector<uchar> status;
+    unsigned int frame_count;
 };
 
 #endif // TRACKER_H

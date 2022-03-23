@@ -9,18 +9,14 @@ Tracker::Tracker(const string& filename, int detector_enum)
     generateColors(2000);
 
     capture >> old_frame;
+    frame_count = 1;
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
+    imshow("black", point_mat);
 
-    vector<KeyPoint> keypoint;
     setDetector(detector_enum);
-    detector->detect(old_frame, keypoint);
-
-    vector<Point2f> temp;
-    for (int i = 0; i < keypoint.size(); i++)
-        temp.push_back(keypoint[i].pt);
-    p0 = temp;
+    detectNewPoint(old_frame, 1);
 }
 
 void Tracker::stopTracking()
@@ -33,12 +29,16 @@ void Tracker::startTracking()
     running = true;
 
     while(running){
-        if (!getNextFrame())
-            break;
+
+        if (!getNextFrame()) break;
+
+        detectNewPoint(new_frame, 10);
+
         calculateOpticalFlow();
+
         filterAndDrawPoint();
-        if (!showResult())
-            break;
+
+        if (!showResult()) break;
     }
 
     waitKey(0);
@@ -62,6 +62,7 @@ bool Tracker::getNextFrame()
     if (new_color_frame.empty())
         return false;
     cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
+    frame_count++;
     return true;
 }
 
@@ -108,7 +109,7 @@ void Tracker::setDetector(int detector_enum)
     switch (detector_enum) {
     case GFTT_Detector: {
         // Увеличить количество точек: maxCorners+
-        detector = GFTTDetector::create(3000, 0.01, 1, 3, false, 0.04);
+        detector = GFTTDetector::create(1000, 0.1, 7, 3, false, 0.04);
         break;
     }
     case FAST_Detector: {
@@ -166,5 +167,34 @@ void Tracker::setDetector(int detector_enum)
         detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.0005f, 4, 4, KAZE::DIFF_PM_G2);
         break;
     }
+    }
+}
+
+void Tracker::detectNewPoint(Mat &frame, int freq)
+{
+    double t = (double)getTickCount();
+    if (frame_count % freq != 0)
+        return;
+
+    detector->detect(frame, new_point);
+
+    fillPointMat(7);
+    for (int i = 0; i < new_point.size(); i++) {
+        if (point_mat.at<uchar>(new_point[i].pt.y, new_point[i].pt.x) == 255)
+            continue;
+        p0.push_back(new_point[i].pt);
+        circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
+    }
+    t = ((double)getTickCount() - t)/getTickFrequency();
+    cout << t << endl;
+    cout << "p0 size" << p0.size() << endl;
+    imshow("black", point_mat);
+}
+
+void Tracker::fillPointMat(int blockSize)
+{
+    point_mat = Mat::zeros(old_frame.size(), old_frame.type());
+    for (int i = 0; i < p0.size(); i++) {
+        circle(point_mat, p0[i], blockSize, Scalar(255), -1);
     }
 }
