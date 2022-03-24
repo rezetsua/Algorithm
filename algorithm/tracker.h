@@ -1,5 +1,5 @@
-#ifndef TRACKER_H
-#define TRACKER_H
+#ifndef HUMANTRACKER_H
+#define HUMANTRACKER_H
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d.hpp>
@@ -24,10 +24,10 @@ enum Detectors {
     AKAZE_Detector
 };
 
-class Tracker
+class HumanTracker
 {
 public:
-    Tracker(const string& filename, int detector);
+    HumanTracker(const string& filename, int detector);
 
 public:
     void startTracking();
@@ -38,7 +38,7 @@ private:
     bool getNextFrame();
     void calculateOpticalFlow();
     void filterAndDrawPoint();
-    bool showResult();
+    bool showResult(bool stepByStep);
     void setDetector(int detector_enum);
     void detectNewPoint(Mat &frame, int freq);
     void fillPointMat(int blockSize);
@@ -51,6 +51,7 @@ private:
     Mat new_frame;
     Mat new_color_frame;
     Mat point_mat;
+    Mat lineMask;
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
     vector<Scalar> colors;
@@ -61,4 +62,4 @@ private:
     unsigned int frame_count;
 };
 
-#endif // TRACKER_H
+#endif // HUMANTRACKER_H

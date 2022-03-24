@@ -1,6 +1,6 @@
 #include "tracker.h"
 
-Tracker::Tracker(const string& filename, int detector_enum)
+HumanTracker::HumanTracker(const string& filename, int detector_enum)
 {
     capture.open(filename);
     if (!capture.isOpened())
@@ -10,21 +10,21 @@ Tracker::Tracker(const string& filename, int detector_enum)
 
     capture >> old_frame;
     frame_count = 1;
+    lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
-    imshow("black", point_mat);
 
     setDetector(detector_enum);
     detectNewPoint(old_frame, 1);
 }
 
-void Tracker::stopTracking()
+void HumanTracker::stopTracking()
 {
     running = false;
 }
 
-void Tracker::startTracking()
+void HumanTracker::startTracking()
 {
     running = true;
 
@@ -38,13 +38,13 @@ void Tracker::startTracking()
 
         filterAndDrawPoint();
 
-        if (!showResult()) break;
+        if (!showResult(false)) break;
     }
 
     waitKey(0);
 }
 
-void Tracker::generateColors(int colorsAmount)
+void HumanTracker::generateColors(int colorsAmount)
 {
     RNG rng;
     for(int i = 0; i < colorsAmount; i++)
@@ -56,7 +56,7 @@ void Tracker::generateColors(int colorsAmount)
     }
 }
 
-bool Tracker::getNextFrame()
+bool HumanTracker::getNextFrame()
 {
     capture >> new_color_frame;
     if (new_color_frame.empty())
@@ -66,16 +66,17 @@ bool Tracker::getNextFrame()
     return true;
 }
 
-void Tracker::calculateOpticalFlow()
+void HumanTracker::calculateOpticalFlow()
 {
     vector<float> err;
     TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
     calcOpticalFlowPyrLK(old_frame, new_frame, p0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
 }
 
-void Tracker::filterAndDrawPoint()
+void HumanTracker::filterAndDrawPoint()
 {
     vector<Point2f> good_new;
+    int count = 0;
     for(uint i = 0; i < p0.size(); i++)
     {
         // Filter
@@ -90,21 +91,26 @@ void Tracker::filterAndDrawPoint()
         }
         // Draw
         circle(new_color_frame, p1[i], 5, Scalar(0,200,0), -1);
+        line(lineMask, p1[i], p0[i], Scalar(200,0,0), 2);
+        add(new_color_frame, lineMask, new_color_frame);
+        count++;
     }
+    cout << count << endl;
     p0 = good_new;
 }
 
-bool Tracker::showResult()
+bool HumanTracker::showResult(bool stepByStep)
 {
+    int pauseTime = stepByStep ? 0 : 30;
     imshow("flow", new_color_frame);
-    int keyboard = waitKey(30);
+    int keyboard = waitKey(pauseTime);
     if (keyboard == 'q' || keyboard == 27)
-        return false;
+        return stepByStep;
     old_frame = new_frame.clone();
     return true;
 }
 
-void Tracker::setDetector(int detector_enum)
+void HumanTracker::setDetector(int detector_enum)
 {
     switch (detector_enum) {
     case GFTT_Detector: {
@@ -170,7 +176,7 @@ void Tracker::setDetector(int detector_enum)
     }
 }
 
-void Tracker::detectNewPoint(Mat &frame, int freq)
+void HumanTracker::detectNewPoint(Mat &frame, int freq)
 {
     double t = (double)getTickCount();
     if (frame_count % freq != 0)
@@ -191,7 +197,7 @@ void Tracker::detectNewPoint(Mat &frame, int freq)
     imshow("black", point_mat);
 }
 
-void Tracker::fillPointMat(int blockSize)
+void HumanTracker::fillPointMat(int blockSize)
 {
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
     for (int i = 0; i < p0.size(); i++) {
