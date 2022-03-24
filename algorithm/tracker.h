@@ -1,6 +1,8 @@
 #ifndef HUMANTRACKER_H
 #define HUMANTRACKER_H
 
+#define OPENCV_TRAITS_ENABLE_DEPRECATED
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/highgui.hpp>
@@ -24,6 +26,19 @@ enum Detectors {
     AKAZE_Detector
 };
 
+class FPoint
+{
+public:
+    FPoint();
+    FPoint(Point2f point);
+
+    void operator = (const Point2f& point);
+
+public:
+    Point2f pt;
+    int staticCount;
+};
+
 class HumanTracker
 {
 public:
@@ -42,6 +57,7 @@ private:
     void setDetector(int detector_enum);
     void detectNewPoint(Mat &frame, int freq);
     void fillPointMat(int blockSize);
+    void deleteStaticPoint(int freq);
 
 private:
     bool running;
@@ -55,8 +71,8 @@ private:
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
     vector<Scalar> colors;
-    vector<Point2f> p0;
-    vector<Point2f> p1;
+    vector<FPoint> p0;
+    vector<FPoint> p1;
     vector<KeyPoint> new_point;
     vector<uchar> status;
     unsigned int frame_count;

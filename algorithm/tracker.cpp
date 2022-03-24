@@ -29,7 +29,6 @@ void HumanTracker::startTracking()
     running = true;
 
     while(running){
-
         if (!getNextFrame()) break;
 
         detectNewPoint(new_frame, 10);
@@ -37,6 +36,8 @@ void HumanTracker::startTracking()
         calculateOpticalFlow();
 
         filterAndDrawPoint();
+
+        deleteStaticPoint(5);
 
         if (!showResult(false)) break;
     }
@@ -70,33 +71,39 @@ void HumanTracker::calculateOpticalFlow()
 {
     vector<float> err;
     TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
-    calcOpticalFlowPyrLK(old_frame, new_frame, p0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
+
+    vector<Point2f> point0, point1;
+    for (int i = 0; i < p0.size(); i++)
+        point0.push_back(p0[i].pt);
+
+    calcOpticalFlowPyrLK(old_frame, new_frame, point0, point1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
+
+    p1 = p0; // связать параметры
+    for (int i = 0; i < point1.size(); i++)
+        p1[i].pt = point1[i];
 }
 
 void HumanTracker::filterAndDrawPoint()
 {
-    vector<Point2f> good_new;
     int count = 0;
-    for(uint i = 0; i < p0.size(); i++)
+    for(int i = 0; i < p1.size(); i++)
     {
-        // Filter
-        if (status[i] == 0)
-            continue;
-        good_new.push_back(p1[i]);
-        float deltaX = abs(p1[i].x - p0[i].x);
-        float deltaY = abs(p1[i].y - p0[i].y);
+        float deltaX = abs(p1[i].pt.x - p0[i].pt.x);
+        float deltaY = abs(p1[i].pt.y - p0[i].pt.y);
         float treshold = 0.1;
         if (deltaX < treshold && deltaY < treshold) {
+            p1[i].staticCount++;
             continue;
         }
+        p1[i].staticCount = 0;
         // Draw
-        circle(new_color_frame, p1[i], 5, Scalar(0,200,0), -1);
-        line(lineMask, p1[i], p0[i], Scalar(200,0,0), 2);
+        circle(new_color_frame, p1[i].pt, 5, Scalar(0,200,0), -1);
+        line(lineMask, p1[i].pt, p0[i].pt, Scalar(200,0,0), 2);
         add(new_color_frame, lineMask, new_color_frame);
         count++;
     }
-    cout << count << endl;
-    p0 = good_new;
+    //cout << "moved point " <<count << endl;
+    p0 = p1;
 }
 
 bool HumanTracker::showResult(bool stepByStep)
@@ -178,7 +185,6 @@ void HumanTracker::setDetector(int detector_enum)
 
 void HumanTracker::detectNewPoint(Mat &frame, int freq)
 {
-    double t = (double)getTickCount();
     if (frame_count % freq != 0)
         return;
 
@@ -191,16 +197,44 @@ void HumanTracker::detectNewPoint(Mat &frame, int freq)
         p0.push_back(new_point[i].pt);
         circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
     }
-    t = ((double)getTickCount() - t)/getTickFrequency();
-    cout << t << endl;
-    cout << "p0 size" << p0.size() << endl;
-    imshow("black", point_mat);
+    cout << "total point amount " << p0.size() << endl;
+    imshow("occupied area", point_mat);
 }
 
 void HumanTracker::fillPointMat(int blockSize)
 {
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
     for (int i = 0; i < p0.size(); i++) {
-        circle(point_mat, p0[i], blockSize, Scalar(255), -1);
+        circle(point_mat, p0[i].pt, blockSize, Scalar(255), -1);
     }
+}
+
+void HumanTracker::deleteStaticPoint(int freq)
+{
+    if (frame_count % freq != 0)
+        return;
+    int count = 0;
+    for (int i = p0.size(); i >= 0; i--) {
+        if (p0[i].staticCount >= freq) {
+            p0.erase(p0.begin() + i);
+            count++;
+        }
+    }
+    cout << "Deleted point " << count << endl;
+}
+
+FPoint::FPoint()
+{
+
+}
+
+FPoint::FPoint(Point2f point)
+{
+    pt = point;
+    staticCount = 0;
+}
+
+void FPoint::operator =(const Point2f &point)
+{
+    this->pt = point;
 }
