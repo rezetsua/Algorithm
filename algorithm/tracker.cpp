@@ -214,7 +214,7 @@ void HumanTracker::deleteStaticPoint(int freq)
     if (frame_count % freq != 0)
         return;
     int count = 0;
-    for (int i = p0.size(); i >= 0; i--) {
+    for (int i = p0.size() - 1; i >= 0; i--) {
         if (p0[i].staticCount >= freq) {
             p0.erase(p0.begin() + i);
             count++;
