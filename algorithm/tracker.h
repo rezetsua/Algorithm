@@ -34,13 +34,14 @@ public:
     FPoint();
     FPoint(Point2f point);
 
-    void operator = (const Point2f& point);
     Scalar generateColor();
+    void updatePath();
 
 public:
     Point2f pt;
     int staticCount;
     Scalar color;
+    vector<Point2f> path;
 };
 
 class HumanTracker
@@ -62,6 +63,8 @@ private:
     void fillPointMat(int blockSize);
     void deleteStaticPoint(int freq);
     void putInfo(string text, int textY);
+    void addPointToPath(int freq);
+    void drawPointPath();
 
 private:
     bool running;

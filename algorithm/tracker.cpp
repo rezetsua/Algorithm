@@ -38,6 +38,8 @@ void HumanTracker::startTracking()
 
         filterAndDrawPoint();
 
+        addPointToPath(10);
+
         deleteStaticPoint(5);
 
         t = ((double)getTickCount() - t)/getTickFrequency();
@@ -49,16 +51,6 @@ void HumanTracker::startTracking()
     waitKey(0);
 }
 
-Scalar FPoint::generateColor()
-{
-    auto now = std::chrono::high_resolution_clock::now();
-    std::mt19937 gen(now.time_since_epoch().count());
-    std::uniform_int_distribution<> uid(1, 255);
-    int r = uid(gen);
-    int g = uid(gen);
-    int b = uid(gen);
-    return Scalar(r,g,b);
-}
 
 bool HumanTracker::getNextFrame()
 {
@@ -98,8 +90,6 @@ void HumanTracker::filterAndDrawPoint()
         p0[i].staticCount = 0;
         // Draw
         circle(new_color_frame, p1[i], 4, p0[i].color, -1);
-        //line(lineMask, p1[i], p0[i].pt, Scalar(200,0,0), 2);
-        add(new_color_frame, lineMask, new_color_frame);
         count++;
     }
     //cout << "moved point " <<count << endl;
@@ -110,6 +100,7 @@ void HumanTracker::filterAndDrawPoint()
 bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
+    add(new_color_frame, lineMask, new_color_frame);
     imshow("flow", new_color_frame);
     imshow("info", info);
     int keyboard = waitKey(pauseTime);
@@ -234,6 +225,28 @@ void HumanTracker::putInfo(string text, int textY)
     cv::putText(info, text, cv::Point(10, textY), cv::FONT_HERSHEY_DUPLEX, 1.0, Scalar(255), 2);
 }
 
+void HumanTracker::addPointToPath(int freq)
+{
+    if (frame_count % freq != 0)
+        return;
+    for (int i = 0; i < p0.size(); i++) {
+        p0[i].updatePath();
+    }
+    drawPointPath();
+}
+
+void HumanTracker::drawPointPath()
+{
+    lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    for (int i = 0; i < p0.size(); i++) {
+        if (p0[i].path.size() > 1) {
+            cout << p0[i].path.size() << endl;
+            for (int j = 1; j < p0[i].path.size(); j++)
+                line(lineMask, p0[i].path[j], p0[i].path[j - 1], p0[i].color, 2);
+        }
+    }
+}
+
 FPoint::FPoint()
 {
 
@@ -246,7 +259,23 @@ FPoint::FPoint(Point2f point)
     color = generateColor();
 }
 
-void FPoint::operator =(const Point2f &point)
+Scalar FPoint::generateColor()
 {
-    this->pt = point;
+    auto now = std::chrono::high_resolution_clock::now();
+    std::mt19937 gen(now.time_since_epoch().count());
+    std::uniform_int_distribution<> uid(1, 255);
+    int r = uid(gen);
+    int g = uid(gen);
+    int b = uid(gen);
+    return Scalar(r,g,b);
+}
+
+void FPoint::updatePath()
+{
+    if (path.size() < 5)
+        path.push_back(pt);
+    else {
+        path.erase(path.begin());
+        path.push_back(pt);
+    }
 }
