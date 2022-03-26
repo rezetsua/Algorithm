@@ -6,13 +6,12 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     if (!capture.isOpened())
         cerr << "Unable to open file!" << endl;
 
-    generateColors(2000);
-
     capture >> old_frame;
     frame_count = 1;
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
+    info = Mat::zeros(old_frame.size(), old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
 
     setDetector(detector_enum);
@@ -29,6 +28,8 @@ void HumanTracker::startTracking()
     running = true;
 
     while(running){
+        double t = (double)getTickCount();
+
         if (!getNextFrame()) break;
 
         detectNewPoint(new_frame, 10);
@@ -39,26 +40,29 @@ void HumanTracker::startTracking()
 
         deleteStaticPoint(5);
 
+        t = ((double)getTickCount() - t)/getTickFrequency();
+        putInfo("FPS " + std::to_string((int)(1/t)), 300);
+
         if (!showResult(false)) break;
     }
 
     waitKey(0);
 }
 
-void HumanTracker::generateColors(int colorsAmount)
+Scalar FPoint::generateColor()
 {
-    RNG rng;
-    for(int i = 0; i < colorsAmount; i++)
-    {
-        int r = rng.uniform(0, 256);
-        int g = rng.uniform(0, 256);
-        int b = rng.uniform(0, 256);
-        colors.push_back(Scalar(r,g,b));
-    }
+    auto now = std::chrono::high_resolution_clock::now();
+    std::mt19937 gen(now.time_since_epoch().count());
+    std::uniform_int_distribution<> uid(1, 255);
+    int r = uid(gen);
+    int g = uid(gen);
+    int b = uid(gen);
+    return Scalar(r,g,b);
 }
 
 bool HumanTracker::getNextFrame()
 {
+    //info = Mat::zeros(old_frame.size(), old_frame.type());
     capture >> new_color_frame;
     if (new_color_frame.empty())
         return false;
@@ -97,8 +101,8 @@ void HumanTracker::filterAndDrawPoint()
         }
         p1[i].staticCount = 0;
         // Draw
-        circle(new_color_frame, p1[i].pt, 5, Scalar(0,200,0), -1);
-        line(lineMask, p1[i].pt, p0[i].pt, Scalar(200,0,0), 2);
+        circle(new_color_frame, p1[i].pt, 4, p1[i].color, -1);
+        //line(lineMask, p1[i].pt, p0[i].pt, Scalar(200,0,0), 2);
         add(new_color_frame, lineMask, new_color_frame);
         count++;
     }
@@ -110,6 +114,7 @@ bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
     imshow("flow", new_color_frame);
+    imshow("info", info);
     int keyboard = waitKey(pauseTime);
     if (keyboard == 'q' || keyboard == 27)
         return stepByStep;
@@ -197,7 +202,7 @@ void HumanTracker::detectNewPoint(Mat &frame, int freq)
         p0.push_back(new_point[i].pt);
         circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
     }
-    cout << "total point amount " << p0.size() << endl;
+    putInfo("Total point amount " + std::to_string(p0.size()), 100);
     imshow("occupied area", point_mat);
 }
 
@@ -220,7 +225,16 @@ void HumanTracker::deleteStaticPoint(int freq)
             count++;
         }
     }
-    cout << "Deleted point " << count << endl;
+    putInfo("Deleted point " + std::to_string(count), 200);
+}
+
+void HumanTracker::putInfo(string text, int textY)
+{
+    if (frame_count % 5 != 0)
+        return;
+    Rect rect(10, textY - 80, info.cols, 100);
+    rectangle(info, rect, cv::Scalar(0), -1);
+    cv::putText(info, text, cv::Point(10, textY), cv::FONT_HERSHEY_DUPLEX, 1.0, Scalar(255), 2);
 }
 
 FPoint::FPoint()
@@ -232,6 +246,7 @@ FPoint::FPoint(Point2f point)
 {
     pt = point;
     staticCount = 0;
+    color = generateColor();
 }
 
 void FPoint::operator =(const Point2f &point)

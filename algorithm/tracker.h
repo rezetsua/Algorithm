@@ -11,6 +11,8 @@
 #include <opencv2/video.hpp>
 
 #include <cmath>
+#include <random>
+#include <ctime>
 
 using namespace cv;
 using namespace std;
@@ -33,10 +35,12 @@ public:
     FPoint(Point2f point);
 
     void operator = (const Point2f& point);
+    Scalar generateColor();
 
 public:
     Point2f pt;
     int staticCount;
+    Scalar color;
 };
 
 class HumanTracker
@@ -49,7 +53,6 @@ public:
     void stopTracking();
 
 private:
-    void generateColors(int colorsAmount);
     bool getNextFrame();
     void calculateOpticalFlow();
     void filterAndDrawPoint();
@@ -58,6 +61,7 @@ private:
     void detectNewPoint(Mat &frame, int freq);
     void fillPointMat(int blockSize);
     void deleteStaticPoint(int freq);
+    void putInfo(string text, int textY);
 
 private:
     bool running;
@@ -68,9 +72,9 @@ private:
     Mat new_color_frame;
     Mat point_mat;
     Mat lineMask;
+    Mat info;
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
-    vector<Scalar> colors;
     vector<FPoint> p0;
     vector<FPoint> p1;
     vector<KeyPoint> new_point;
