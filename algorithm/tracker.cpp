@@ -76,15 +76,11 @@ void HumanTracker::calculateOpticalFlow()
     vector<float> err;
     TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
 
-    vector<Point2f> point0, point1;
+    vector<Point2f> point0;
     for (int i = 0; i < p0.size(); i++)
         point0.push_back(p0[i].pt);
 
-    calcOpticalFlowPyrLK(old_frame, new_frame, point0, point1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
-
-    p1 = p0; // связать параметры
-    for (int i = 0; i < point1.size(); i++)
-        p1[i].pt = point1[i];
+    calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
 }
 
 void HumanTracker::filterAndDrawPoint()
@@ -92,22 +88,23 @@ void HumanTracker::filterAndDrawPoint()
     int count = 0;
     for(int i = 0; i < p1.size(); i++)
     {
-        float deltaX = abs(p1[i].pt.x - p0[i].pt.x);
-        float deltaY = abs(p1[i].pt.y - p0[i].pt.y);
+        float deltaX = abs(p1[i].x - p0[i].pt.x);
+        float deltaY = abs(p1[i].y - p0[i].pt.y);
         float treshold = 0.1;
         if (deltaX < treshold && deltaY < treshold) {
-            p1[i].staticCount++;
+            p0[i].staticCount++;
             continue;
         }
-        p1[i].staticCount = 0;
+        p0[i].staticCount = 0;
         // Draw
-        circle(new_color_frame, p1[i].pt, 4, p1[i].color, -1);
-        //line(lineMask, p1[i].pt, p0[i].pt, Scalar(200,0,0), 2);
+        circle(new_color_frame, p1[i], 4, p0[i].color, -1);
+        //line(lineMask, p1[i], p0[i].pt, Scalar(200,0,0), 2);
         add(new_color_frame, lineMask, new_color_frame);
         count++;
     }
     //cout << "moved point " <<count << endl;
-    p0 = p1;
+    for (int i = 0; i < p1.size(); i++)
+        p0[i].pt = p1[i];
 }
 
 bool HumanTracker::showResult(bool stepByStep)

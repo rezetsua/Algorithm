@@ -76,7 +76,7 @@ private:
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
     vector<FPoint> p0;
-    vector<FPoint> p1;
+    vector<Point2f> p1;
     vector<KeyPoint> new_point;
     vector<uchar> status;
     unsigned int frame_count;
