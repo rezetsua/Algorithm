@@ -40,6 +40,7 @@ public:
 public:
     Point2f pt;
     int staticCount;
+    bool goodPath;
     Scalar color;
     vector<Point2f> path;
 };
@@ -59,12 +60,13 @@ private:
     void filterAndDrawPoint();
     bool showResult(bool stepByStep);
     void setDetector(int detector_enum);
-    void detectNewPoint(Mat &frame, int freq);
+    void detectNewPoint(Mat &frame, int queue_index);
     void fillPointMat(int blockSize);
-    void deleteStaticPoint(int freq);
+    void deleteStaticPoint(int queue_index);
     void putInfo(string text, int textY);
-    void addPointToPath(int freq);
+    void addPointToPath(int queue_index);
     void drawPointPath();
+    void approximatePath();
 
 private:
     bool running;
@@ -83,6 +85,7 @@ private:
     vector<KeyPoint> new_point;
     vector<uchar> status;
     unsigned int frame_count;
+    int queue_count;
 };
 
 #endif // HUMANTRACKER_H

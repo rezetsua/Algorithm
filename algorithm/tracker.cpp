@@ -8,6 +8,8 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
 
     capture >> old_frame;
     frame_count = 1;
+    queue_count = 1;
+
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
@@ -32,18 +34,19 @@ void HumanTracker::startTracking()
 
         if (!getNextFrame()) break;
 
-        detectNewPoint(new_frame, 10);
+        detectNewPoint(new_frame, 1);
 
         calculateOpticalFlow();
 
         filterAndDrawPoint();
 
-        addPointToPath(10);
+        deleteStaticPoint(2);
 
-        deleteStaticPoint(5);
+        addPointToPath(3);
 
         t = ((double)getTickCount() - t)/getTickFrequency();
-        putInfo("FPS " + std::to_string((int)(1/t)), 300);
+        if (frame_count % 10 == 0)
+            putInfo("FPS " + std::to_string((int)(1/t)), 400);
 
         if (!showResult(false)) break;
     }
@@ -54,12 +57,14 @@ void HumanTracker::startTracking()
 
 bool HumanTracker::getNextFrame()
 {
-    //info = Mat::zeros(old_frame.size(), old_frame.type());
     capture >> new_color_frame;
     if (new_color_frame.empty())
         return false;
     cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
     frame_count++;
+    queue_count++;
+    if (queue_count > 10)
+        queue_count = 1;
     return true;
 }
 
@@ -89,10 +94,9 @@ void HumanTracker::filterAndDrawPoint()
         }
         p0[i].staticCount = 0;
         // Draw
-        circle(new_color_frame, p1[i], 4, p0[i].color, -1);
+        //circle(new_color_frame, p1[i], 4, p0[i].color, -1);
         count++;
     }
-    //cout << "moved point " <<count << endl;
     for (int i = 0; i < p1.size(); i++)
         p0[i].pt = p1[i];
 }
@@ -176,9 +180,9 @@ void HumanTracker::setDetector(int detector_enum)
     }
 }
 
-void HumanTracker::detectNewPoint(Mat &frame, int freq)
+void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
 {
-    if (frame_count % freq != 0)
+    if (queue_count != queue_index)
         return;
 
     detector->detect(frame, new_point);
@@ -191,7 +195,7 @@ void HumanTracker::detectNewPoint(Mat &frame, int freq)
         circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
     }
     putInfo("Total point amount " + std::to_string(p0.size()), 100);
-    imshow("occupied area", point_mat);
+    //imshow("occupied area", point_mat);
 }
 
 void HumanTracker::fillPointMat(int blockSize)
@@ -202,49 +206,77 @@ void HumanTracker::fillPointMat(int blockSize)
     }
 }
 
-void HumanTracker::deleteStaticPoint(int freq)
+void HumanTracker::deleteStaticPoint(int queue_index)
 {
-    if (frame_count % freq != 0)
+    if (queue_count != queue_index)
         return;
     int count = 0;
     for (int i = p0.size() - 1; i >= 0; i--) {
-        if (p0[i].staticCount >= freq) {
+        if (p0[i].staticCount >= 5) {
             p0.erase(p0.begin() + i);
             count++;
         }
     }
-    putInfo("Deleted point " + std::to_string(count), 200);
+    putInfo("Deleted static point " + std::to_string(count), 200);
 }
 
 void HumanTracker::putInfo(string text, int textY)
 {
-    if (frame_count % 5 != 0)
-        return;
     Rect rect(10, textY - 80, info.cols, 100);
     rectangle(info, rect, cv::Scalar(0), -1);
     cv::putText(info, text, cv::Point(10, textY), cv::FONT_HERSHEY_DUPLEX, 1.0, Scalar(255), 2);
 }
 
-void HumanTracker::addPointToPath(int freq)
+void HumanTracker::addPointToPath(int queue_index)
 {
-    if (frame_count % freq != 0)
+    if (queue_count != queue_index)
         return;
     for (int i = 0; i < p0.size(); i++) {
         p0[i].updatePath();
     }
-    drawPointPath();
+    approximatePath();
+    //drawPointPath();
 }
 
 void HumanTracker::drawPointPath()
 {
     lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     for (int i = 0; i < p0.size(); i++) {
-        if (p0[i].path.size() > 1) {
-            cout << p0[i].path.size() << endl;
+        // Filter
+        if (p0[i].path.size() > 2) {
+            // Draw
             for (int j = 1; j < p0[i].path.size(); j++)
                 line(lineMask, p0[i].path[j], p0[i].path[j - 1], p0[i].color, 2);
         }
     }
+}
+
+void HumanTracker::approximatePath()
+{
+    lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    vector<Point2f> apx;
+    for (int i = 0; i < p0.size(); i++) {
+        if (p0[i].path.size() > 2) {
+            // Approximate
+            double epsilon = 0.2 * arcLength(p0[i].path, false);
+            approxPolyDP(p0[i].path, apx, epsilon, false);
+            // Filter
+            p0[i].goodPath = apx.size() > 2 ? false : true;
+            Scalar color = p0[i].goodPath ? Scalar(0, 200, 0) : Scalar(0, 0, 200);
+            // Draw
+            for (int j = 1; j < apx.size(); j++)
+                line(lineMask, apx[j], apx[j - 1], color, 2);
+        }
+    }
+    // Delete bad point
+    int count = 0;
+    for (int i = p0.size() - 1; i >= 0; i--) {
+        if (!p0[i].goodPath) {
+            p0.erase(p0.begin() + i);
+            count++;
+        }
+    }
+    putInfo("Deleted bad point " + std::to_string(count), 300);
 }
 
 FPoint::FPoint()
@@ -256,6 +288,7 @@ FPoint::FPoint(Point2f point)
 {
     pt = point;
     staticCount = 0;
+    goodPath = true;
     color = generateColor();
 }
 
