@@ -36,12 +36,15 @@ public:
 
     Scalar generateColor();
     void updatePath();
+    void updateVelocity();
 
 public:
     Point2f pt;
     int staticCount;
     bool goodPath;
     Scalar color;
+    double instantVelocity;
+    double averageVelocity;
     vector<Point2f> path;
 };
 

@@ -85,10 +85,9 @@ void HumanTracker::filterAndDrawPoint()
     int count = 0;
     for(int i = 0; i < p1.size(); i++)
     {
-        float deltaX = abs(p1[i].x - p0[i].pt.x);
-        float deltaY = abs(p1[i].y - p0[i].pt.y);
-        float treshold = 0.1;
-        if (deltaX < treshold && deltaY < treshold) {
+        double delta = cv::norm(p1[i] - p0[i].pt);
+        float treshold = 0.2;
+        if (delta < treshold ) {
             p0[i].staticCount++;
             continue;
         }
@@ -119,7 +118,7 @@ void HumanTracker::setDetector(int detector_enum)
     switch (detector_enum) {
     case GFTT_Detector: {
         // Увеличить количество точек: maxCorners+
-        detector = GFTTDetector::create(1000, 0.1, 7, 3, false, 0.04);
+        detector = GFTTDetector::create(1000, 0.07, 7, 3, false, 0.04);
         break;
     }
     case FAST_Detector: {
@@ -246,7 +245,8 @@ void HumanTracker::drawPointPath()
         if (p0[i].path.size() > 2) {
             // Draw
             for (int j = 1; j < p0[i].path.size(); j++)
-                line(lineMask, p0[i].path[j], p0[i].path[j - 1], p0[i].color, 2);
+                line(lineMask, p0[i].path[j], p0[i].path[j - 1],
+                     Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20), 2);
         }
     }
 }
@@ -262,7 +262,8 @@ void HumanTracker::approximatePath()
             approxPolyDP(p0[i].path, apx, epsilon, false);
             // Filter
             p0[i].goodPath = apx.size() > 2 ? false : true;
-            Scalar color = p0[i].goodPath ? Scalar(0, 200, 0) : Scalar(0, 0, 200);
+            Scalar color = p0[i].goodPath
+                         ? Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20) : Scalar(255, 0, 0);
             // Draw
             for (int j = 1; j < apx.size(); j++)
                 line(lineMask, apx[j], apx[j - 1], color, 2);
@@ -288,6 +289,8 @@ FPoint::FPoint(Point2f point)
 {
     pt = point;
     staticCount = 0;
+    instantVelocity = 0;
+    averageVelocity = 0;
     goodPath = true;
     color = generateColor();
 }
@@ -311,4 +314,14 @@ void FPoint::updatePath()
         path.erase(path.begin());
         path.push_back(pt);
     }
+    updateVelocity();
 }
+
+void FPoint::updateVelocity()
+{
+    if (path.size() < 2)
+        return;
+    instantVelocity = cv::norm(path[path.size() - 1] - path[path.size() - 2]);
+    averageVelocity = cv::norm(path[path.size() - 1] - path[0]) / path.size();
+}
+
