@@ -32,7 +32,7 @@ class FPoint
 {
 public:
     FPoint();
-    FPoint(Point2f point);
+    FPoint(Point2f point, int originFrame);
 
     Scalar generateColor();
     void updatePath();
@@ -41,6 +41,7 @@ public:
 public:
     Point2f pt;
     int staticCount;
+    int originFrameCount;
     bool goodPath;
     Scalar color;
     double instantVelocity;
@@ -70,6 +71,7 @@ private:
     void addPointToPath(int queue_index);
     void drawPointPath();
     void approximatePath();
+    void drawDirection(vector<Point2f> &apx, int velocity);
 
 private:
     bool running;
@@ -80,6 +82,7 @@ private:
     Mat new_color_frame;
     Mat point_mat;
     Mat lineMask;
+    Mat directionMask;
     Mat info;
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;

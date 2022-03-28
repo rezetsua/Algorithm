@@ -11,6 +11,7 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     queue_count = 1;
 
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
+    directionMask = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
     info = Mat::zeros(old_frame.size(), old_frame.type());
@@ -103,11 +104,11 @@ void HumanTracker::filterAndDrawPoint()
 bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
+    cvtColor(directionMask, lineMask, COLOR_HSV2BGR);
     add(new_color_frame, lineMask, new_color_frame);
-    imshow("flow", new_color_frame);
     imshow("info", info);
-    int keyboard = waitKey(pauseTime);
-    if (keyboard == 'q' || keyboard == 27)
+    imshow("flow", new_color_frame);
+    if (waitKey(pauseTime) == 27)
         return stepByStep;
     old_frame = new_frame.clone();
     return true;
@@ -190,7 +191,7 @@ void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
     for (int i = 0; i < new_point.size(); i++) {
         if (point_mat.at<uchar>(new_point[i].pt.y, new_point[i].pt.x) == 255)
             continue;
-        p0.push_back(new_point[i].pt);
+        p0.push_back(FPoint(new_point[i].pt, frame_count));
         circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
     }
     putInfo("Total point amount " + std::to_string(p0.size()), 100);
@@ -254,6 +255,7 @@ void HumanTracker::drawPointPath()
 void HumanTracker::approximatePath()
 {
     lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    directionMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     vector<Point2f> apx;
     for (int i = 0; i < p0.size(); i++) {
         if (p0[i].path.size() > 2) {
@@ -263,10 +265,13 @@ void HumanTracker::approximatePath()
             // Filter
             p0[i].goodPath = apx.size() > 2 ? false : true;
             Scalar color = p0[i].goodPath
-                         ? Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20) : Scalar(255, 0, 0);
+                         ? Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20)
+                         : Scalar(255, 0, 0);
             // Draw
-            for (int j = 1; j < apx.size(); j++)
-                line(lineMask, apx[j], apx[j - 1], color, 2);
+//            for (int j = 1; j < apx.size(); j++)
+//                line(lineMask, apx[j], apx[j - 1], color, 2);
+
+            drawDirection(apx, p0[i].averageVelocity);
         }
     }
     // Delete bad point
@@ -280,17 +285,44 @@ void HumanTracker::approximatePath()
     putInfo("Deleted bad point " + std::to_string(count), 300);
 }
 
+void HumanTracker::drawDirection(vector<Point2f> &apx, int velocity)
+{
+    if (apx.size() < 2)
+        return;
+
+    Point2f pointDirection;
+    float p0x = apx[apx.size() - 2].x;
+    float p1x = apx[apx.size() - 1].x;
+    float deltax = p1x - p0x;
+    pointDirection.x = p1x + deltax / 2;
+
+    float p0y = apx[apx.size() - 2].y;
+    float p1y = apx[apx.size() - 1].y;
+    float deltay = p1y - p0y;
+    pointDirection.y = p1y + deltay / 2;
+
+    int angle = round(atan2(deltay, deltax) * 180 / 3.14);
+    if (angle < 0)
+        angle = 360 + angle;
+
+    //Scalar dirColor(angle / 2, velocity * 25, 255);
+    Scalar dirColor(angle / 2, 255, 255);
+
+    arrowedLine(directionMask, apx[apx.size() - 1], pointDirection, dirColor, 1);
+}
+
 FPoint::FPoint()
 {
 
 }
 
-FPoint::FPoint(Point2f point)
+FPoint::FPoint(Point2f point, int originFrame)
 {
     pt = point;
     staticCount = 0;
     instantVelocity = 0;
     averageVelocity = 0;
+    originFrameCount = originFrame;
     goodPath = true;
     color = generateColor();
 }
