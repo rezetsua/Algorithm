@@ -94,7 +94,7 @@ void HumanTracker::filterAndDrawPoint()
         }
         p0[i].staticCount = 0;
         // Draw
-        //circle(new_color_frame, p1[i], 4, p0[i].color, -1);
+        //circle(new_color_frame, p1[i], 2, p0[i].color, -1);
         count++;
     }
     for (int i = 0; i < p1.size(); i++)
@@ -104,8 +104,10 @@ void HumanTracker::filterAndDrawPoint()
 bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
+
     Mat directionMaskBGR = lineMask.clone();
     cvtColor(directionMask, directionMaskBGR, COLOR_HSV2BGR);
+    imshow("directionMaskBGR", directionMaskBGR);
     add(lineMask, directionMaskBGR, lineMask);
     add(new_color_frame, lineMask, new_color_frame);
     imshow("info", info);
@@ -273,7 +275,7 @@ void HumanTracker::approximatePath()
 //            for (int j = 1; j < apx.size(); j++)
 //                line(lineMask, apx[j], apx[j - 1], color, 2);
             if (p0[i].goodPath)
-                drawDirection(apx, p0[i].averageVelocity);
+                drawDirection(apx, i);
         }
     }
     // Delete bad point
@@ -287,30 +289,33 @@ void HumanTracker::approximatePath()
     putInfo("Deleted bad point " + std::to_string(count), 300);
 }
 
-void HumanTracker::drawDirection(vector<Point2f> &apx, int velocity)
+void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
 {
     if (apx.size() < 2)
         return;
 
     Point2f pointDirection;
+    //int predictDiv = 2;
+    int predictDiv = 4;
     float p0x = apx[apx.size() - 2].x;
     float p1x = apx[apx.size() - 1].x;
     float deltax = p1x - p0x;
-    pointDirection.x = p1x + deltax / 2;
+    pointDirection.x = p1x + deltax / predictDiv;
 
     float p0y = apx[apx.size() - 2].y;
     float p1y = apx[apx.size() - 1].y;
     float deltay = p1y - p0y;
-    pointDirection.y = p1y + deltay / 2;
+    pointDirection.y = p1y + deltay / predictDiv;
 
     int angle = round(atan2(deltay, deltax) * 180 / 3.14);
     if (angle < 0)
         angle = 360 + angle;
 
-    //Scalar dirColor(angle / 2, velocity * 25, 255);
+    //Scalar dirColor(angle / 2, p0[index].averageVelocity * 25, 255);
     Scalar dirColor(angle / 2, 255, 255);
 
     arrowedLine(directionMask, apx[apx.size() - 1], pointDirection, dirColor, 1);
+    //circle(directionMask, pointDirection, 3, dirColor, -1);
 }
 
 FPoint::FPoint()

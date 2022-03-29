@@ -71,7 +71,7 @@ private:
     void addPointToPath(int queue_index);
     void drawPointPath();
     void approximatePath();
-    void drawDirection(vector<Point2f> &apx, int velocity);
+    void drawDirection(vector<Point2f> &apx, int index);
 
 private:
     bool running;
