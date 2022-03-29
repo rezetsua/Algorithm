@@ -104,7 +104,9 @@ void HumanTracker::filterAndDrawPoint()
 bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
-    cvtColor(directionMask, lineMask, COLOR_HSV2BGR);
+    Mat directionMaskBGR = lineMask.clone();
+    cvtColor(directionMask, directionMaskBGR, COLOR_HSV2BGR);
+    add(lineMask, directionMaskBGR, lineMask);
     add(new_color_frame, lineMask, new_color_frame);
     imshow("info", info);
     imshow("flow", new_color_frame);
@@ -270,8 +272,8 @@ void HumanTracker::approximatePath()
             // Draw
 //            for (int j = 1; j < apx.size(); j++)
 //                line(lineMask, apx[j], apx[j - 1], color, 2);
-
-            drawDirection(apx, p0[i].averageVelocity);
+            if (p0[i].goodPath)
+                drawDirection(apx, p0[i].averageVelocity);
         }
     }
     // Delete bad point
