@@ -43,6 +43,7 @@ public:
     int staticCount;
     int originFrameCount;
     bool goodPath;
+    bool dirColor;
     Scalar color;
     double instantVelocity;
     double averageVelocity;
@@ -72,9 +73,16 @@ private:
     void drawPointPath();
     void approximatePath();
     void drawDirection(vector<Point2f> &apx, int index);
+    void fillHSV2BGR();
+    Scalar cvtAngleToBGR(int angle);
+    void mergePointToObject(int queue_index, int chanels);
 
 private:
     bool running;
+    bool showPoint = true;
+    bool showPath = false;
+    bool showApproximanedPath = false;
+    bool showDirection = false;
 
 private:
     Mat old_frame;
@@ -83,6 +91,7 @@ private:
     Mat point_mat;
     Mat lineMask;
     Mat directionMask;
+    Mat mergeMask;
     Mat info;
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
@@ -90,6 +99,7 @@ private:
     vector<Point2f> p1;
     vector<KeyPoint> new_point;
     vector<uchar> status;
+    vector<Scalar> angleToBGR;
     unsigned int frame_count;
     int queue_count;
 };

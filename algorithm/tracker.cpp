@@ -12,11 +12,13 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
 
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     directionMask = Mat::zeros(old_frame.size(), old_frame.type());
+    mergeMask = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
     info = Mat::zeros(old_frame.size(), old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
 
+    fillHSV2BGR();
     setDetector(detector_enum);
     detectNewPoint(old_frame, 1);
 }
@@ -44,6 +46,8 @@ void HumanTracker::startTracking()
         deleteStaticPoint(2);
 
         addPointToPath(3);
+
+        mergePointToObject(4, 12);
 
         t = ((double)getTickCount() - t)/getTickFrequency();
         if (frame_count % 10 == 0)
@@ -94,7 +98,8 @@ void HumanTracker::filterAndDrawPoint()
         }
         p0[i].staticCount = 0;
         // Draw
-        //circle(new_color_frame, p1[i], 2, p0[i].color, -1);
+        if (showPoint)
+            circle(new_color_frame, p1[i], 2, p0[i].color, -1);
         count++;
     }
     for (int i = 0; i < p1.size(); i++)
@@ -105,11 +110,10 @@ bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
 
-    Mat directionMaskBGR = lineMask.clone();
-    cvtColor(directionMask, directionMaskBGR, COLOR_HSV2BGR);
-    imshow("directionMaskBGR", directionMaskBGR);
-    add(lineMask, directionMaskBGR, lineMask);
+    imshow("directionMaskBGR", directionMask);
+    add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
+    //add(new_color_frame, mergeMask, new_color_frame);
     imshow("info", info);
     imshow("flow", new_color_frame);
     if (waitKey(pauseTime) == 27)
@@ -239,7 +243,8 @@ void HumanTracker::addPointToPath(int queue_index)
         p0[i].updatePath();
     }
     approximatePath();
-    //drawPointPath();
+    if (showPath)
+        drawPointPath();
 }
 
 void HumanTracker::drawPointPath()
@@ -258,8 +263,10 @@ void HumanTracker::drawPointPath()
 
 void HumanTracker::approximatePath()
 {
-    lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
-    directionMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    if (showApproximanedPath)
+        lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    if (showDirection)
+        directionMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     vector<Point2f> apx;
     for (int i = 0; i < p0.size(); i++) {
         if (p0[i].path.size() > 2) {
@@ -272,8 +279,9 @@ void HumanTracker::approximatePath()
                          ? Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20)
                          : Scalar(255, 0, 0);
             // Draw
-//            for (int j = 1; j < apx.size(); j++)
-//                line(lineMask, apx[j], apx[j - 1], color, 2);
+            if (showApproximanedPath)
+                for (int j = 1; j < apx.size(); j++)
+                    line(lineMask, apx[j], apx[j - 1], color, 2);
             if (p0[i].goodPath)
                 drawDirection(apx, i);
         }
@@ -295,8 +303,7 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
         return;
 
     Point2f pointDirection;
-    //int predictDiv = 2;
-    int predictDiv = 4;
+    int predictDiv = 2;
     float p0x = apx[apx.size() - 2].x;
     float p1x = apx[apx.size() - 1].x;
     float deltax = p1x - p0x;
@@ -306,16 +313,77 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
     float p1y = apx[apx.size() - 1].y;
     float deltay = p1y - p0y;
     pointDirection.y = p1y + deltay / predictDiv;
-
-    int angle = round(atan2(deltay, deltax) * 180 / 3.14);
+    int angle = round(atan2(- deltay, deltax) * 180 / 3.14);
     if (angle < 0)
         angle = 360 + angle;
 
-    //Scalar dirColor(angle / 2, p0[index].averageVelocity * 25, 255);
-    Scalar dirColor(angle / 2, 255, 255);
+    Scalar dirColor = cvtAngleToBGR(angle);
+    p0[index].color = dirColor;
+    p0[index].dirColor = true;
 
-    arrowedLine(directionMask, apx[apx.size() - 1], pointDirection, dirColor, 1);
-    //circle(directionMask, pointDirection, 3, dirColor, -1);
+    if (showDirection)
+        arrowedLine(directionMask, apx[apx.size() - 1], pointDirection, dirColor, 1);
+}
+
+void HumanTracker::fillHSV2BGR()
+{
+    for (int i = 0; i < 180; i++) {
+        Mat bgr;
+        Mat hsv(1,1, CV_8UC3, Scalar(i, 255, 255));
+        cvtColor(hsv, bgr, COLOR_HSV2BGR);
+        angleToBGR.push_back(Scalar(bgr.data[0], bgr.data[1], bgr.data[2]));
+    }
+}
+
+Scalar HumanTracker::cvtAngleToBGR(int angle)
+{
+    if (angle > 360 || angle < 0)
+        return Scalar(0, 0, 0);
+
+    int index = angle/2 - 1;
+
+    if (index < 0 || index > 179)
+        return angleToBGR[0];
+    else
+        return angleToBGR[index];
+}
+
+void HumanTracker::mergePointToObject(int queue_index, int chanels)
+{
+    if (queue_count != queue_index)
+        return;
+
+    // Draw point
+    mergeMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    for (int i = 0; i < p0.size(); i++)
+        if (p0[i].dirColor)
+            circle(mergeMask, p0[i].pt, 4, p0[i].color, -1);
+
+    Mat mergeMaskHSV = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    cvtColor(mergeMask, mergeMaskHSV, COLOR_BGR2HSV);
+    int angleStep = 180 / chanels;
+    for (int i = 0; i < chanels; i++) {
+        Mat inRangeMat = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+        inRange(mergeMaskHSV, Scalar(angleStep * i, 255, 255), Scalar(angleStep * (i + 1), 255, 255), inRangeMat);
+
+        vector<vector<Point>> contours;
+        cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+        cv::dilate(inRangeMat, inRangeMat, structuringElement5x5);
+        cv::dilate(inRangeMat, inRangeMat, structuringElement5x5);
+        cv::erode(inRangeMat, inRangeMat, structuringElement5x5);
+        cv::erode(inRangeMat, inRangeMat, structuringElement5x5);
+        cv::findContours(inRangeMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+        vector<vector<Point> > convexHulls(contours.size());
+        for (unsigned int i = 0; i < contours.size(); i++)
+            convexHull(contours[i], convexHulls[i]);
+
+        Scalar color = Scalar(angleStep * i + angleStep / 2, 255, 255);
+        drawContours(mergeMaskHSV, convexHulls, -1, color, -1);
+    }
+
+    cvtColor(mergeMaskHSV, mergeMask, COLOR_HSV2BGR);
+    imshow("mergePointToObject", mergeMask);
 }
 
 FPoint::FPoint()
@@ -331,6 +399,7 @@ FPoint::FPoint(Point2f point, int originFrame)
     averageVelocity = 0;
     originFrameCount = originFrame;
     goodPath = true;
+    dirColor = false;
     color = generateColor();
 }
 
