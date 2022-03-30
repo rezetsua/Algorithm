@@ -9,6 +9,8 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     capture >> old_frame;
     frame_count = 1;
     queue_count = 1;
+    deletedGoodPathAmount = 0;
+    goodPathLifeTimeSum = 0;
 
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     directionMask = Mat::zeros(old_frame.size(), old_frame.type());
@@ -49,9 +51,11 @@ void HumanTracker::startTracking()
 
         mergePointToObject(4, 12);
 
+        showPathInfo(2);
+
         t = ((double)getTickCount() - t)/getTickFrequency();
         if (frame_count % 10 == 0)
-            putInfo("FPS " + std::to_string((int)(1/t)), 400);
+            putInfo("FPS " + std::to_string((int)(1/t)), 5);
 
         if (!showResult(false)) break;
     }
@@ -68,7 +72,7 @@ bool HumanTracker::getNextFrame()
     cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
     frame_count++;
     queue_count++;
-    if (queue_count > 10)
+    if (queue_count > 5)
         queue_count = 1;
     return true;
 }
@@ -91,7 +95,7 @@ void HumanTracker::filterAndDrawPoint()
     for(int i = 0; i < p1.size(); i++)
     {
         double delta = cv::norm(p1[i] - p0[i].pt);
-        float treshold = 0.2;
+        float treshold = 0.3;
         if (delta < treshold ) {
             p0[i].staticCount++;
             continue;
@@ -109,11 +113,9 @@ void HumanTracker::filterAndDrawPoint()
 bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
-
-    imshow("directionMaskBGR", directionMask);
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
-    //add(new_color_frame, mergeMask, new_color_frame);
+    add(new_color_frame, mergeMask, new_color_frame);
     imshow("info", info);
     imshow("flow", new_color_frame);
     if (waitKey(pauseTime) == 27)
@@ -127,7 +129,7 @@ void HumanTracker::setDetector(int detector_enum)
     switch (detector_enum) {
     case GFTT_Detector: {
         // Увеличить количество точек: maxCorners+
-        detector = GFTTDetector::create(1000, 0.07, 7, 3, false, 0.04);
+        detector = GFTTDetector::create(1400, 0.03, 3, 3, false, 0.04);
         break;
     }
     case FAST_Detector: {
@@ -202,7 +204,7 @@ void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
         p0.push_back(FPoint(new_point[i].pt, frame_count));
         circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
     }
-    putInfo("Total point amount " + std::to_string(p0.size()), 100);
+    putInfo("Total point amount " + std::to_string(p0.size()), 1);
     //imshow("occupied area", point_mat);
 }
 
@@ -221,16 +223,18 @@ void HumanTracker::deleteStaticPoint(int queue_index)
     int count = 0;
     for (int i = p0.size() - 1; i >= 0; i--) {
         if (p0[i].staticCount >= 5) {
+            collectPathInfo(i);
             p0.erase(p0.begin() + i);
             count++;
         }
     }
-    putInfo("Deleted static point " + std::to_string(count), 200);
+    putInfo("Deleted static point " + std::to_string(count), 2);
 }
 
 void HumanTracker::putInfo(string text, int textY)
 {
-    Rect rect(10, textY - 80, info.cols, 100);
+    textY *= 50;
+    Rect rect(10, textY - 40, info.cols, 50);
     rectangle(info, rect, cv::Scalar(0), -1);
     cv::putText(info, text, cv::Point(10, textY), cv::FONT_HERSHEY_DUPLEX, 1.0, Scalar(255), 2);
 }
@@ -256,7 +260,7 @@ void HumanTracker::drawPointPath()
             // Draw
             for (int j = 1; j < p0[i].path.size(); j++)
                 line(lineMask, p0[i].path[j], p0[i].path[j - 1],
-                     Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20), 2);
+                     Scalar(0, p0[i].averageVelocity * 40, 255 - p0[i].averageVelocity * 40), 2);
         }
     }
 }
@@ -276,7 +280,7 @@ void HumanTracker::approximatePath()
             // Filter
             p0[i].goodPath = apx.size() > 2 ? false : true;
             Scalar color = p0[i].goodPath
-                         ? Scalar(0, p0[i].averageVelocity * 20, 255 - p0[i].averageVelocity * 20)
+                         ? Scalar(0, p0[i].averageVelocity * 40, 255 - p0[i].averageVelocity * 40)
                          : Scalar(255, 0, 0);
             // Draw
             if (showApproximanedPath)
@@ -290,11 +294,12 @@ void HumanTracker::approximatePath()
     int count = 0;
     for (int i = p0.size() - 1; i >= 0; i--) {
         if (!p0[i].goodPath) {
+            collectPathInfo(i);
             p0.erase(p0.begin() + i);
             count++;
         }
     }
-    putInfo("Deleted bad point " + std::to_string(count), 300);
+    putInfo("Deleted bad point " + std::to_string(count), 3);
 }
 
 void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
@@ -350,9 +355,13 @@ Scalar HumanTracker::cvtAngleToBGR(int angle)
 
 void HumanTracker::mergePointToObject(int queue_index, int chanels)
 {
+    if (!showMergePoint)
+        return;
+
     if (queue_count != queue_index)
         return;
 
+    double t = (double)getTickCount();
     // Draw point
     mergeMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     for (int i = 0; i < p0.size(); i++)
@@ -367,11 +376,12 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
         inRange(mergeMaskHSV, Scalar(angleStep * i, 255, 255), Scalar(angleStep * (i + 1), 255, 255), inRangeMat);
 
         vector<vector<Point>> contours;
-        cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
-        cv::dilate(inRangeMat, inRangeMat, structuringElement5x5);
-        cv::dilate(inRangeMat, inRangeMat, structuringElement5x5);
-        cv::erode(inRangeMat, inRangeMat, structuringElement5x5);
-        cv::erode(inRangeMat, inRangeMat, structuringElement5x5);
+        cv::Mat rectKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 6));
+        cv::Mat squareKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+        cv::dilate(inRangeMat, inRangeMat, rectKernel);
+        cv::dilate(inRangeMat, inRangeMat, rectKernel);
+        cv::erode(inRangeMat, inRangeMat, squareKernel);
+        cv::erode(inRangeMat, inRangeMat, squareKernel);
         cv::findContours(inRangeMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
         vector<vector<Point> > convexHulls(contours.size());
@@ -383,12 +393,39 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
     }
 
     cvtColor(mergeMaskHSV, mergeMask, COLOR_HSV2BGR);
-    imshow("mergePointToObject", mergeMask);
+    t = ((double)getTickCount() - t)/getTickFrequency();
+    cout << t << endl;
+}
+
+void HumanTracker::collectPathInfo(int index)
+{
+    if (!p0[index].dirColor)
+        return;
+
+    goodPathLifeTimeSum += frame_count - p0[index].originFrameCount;
+    deletedGoodPathAmount++;
+}
+
+void HumanTracker::showPathInfo(int queue_index)
+{
+    if (queue_count != queue_index || deletedGoodPathAmount == 0)
+        return;
+    int averagePathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
+    putInfo("Average path life time " + std::to_string(averagePathLifeTime), 4);
+    goodPathLifeTimeSum = 0;
+    deletedGoodPathAmount = 0;
 }
 
 FPoint::FPoint()
 {
-
+    pt = Point2f(0, 0);
+    staticCount = 0;
+    instantVelocity = 0;
+    averageVelocity = 0;
+    originFrameCount = 0;
+    goodPath = true;
+    dirColor = false;
+    color = generateColor();
 }
 
 FPoint::FPoint(Point2f point, int originFrame)
