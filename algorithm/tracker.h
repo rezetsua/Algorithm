@@ -79,10 +79,11 @@ private:
 
 private:
     bool running;
-    bool showPoint = true;
+    bool showPoint = false;
     bool showPath = false;
     bool showApproximanedPath = false;
-    bool showDirection = false;
+    bool showDirection = true;
+    bool showObject = false;
 
 private:
     Mat old_frame;

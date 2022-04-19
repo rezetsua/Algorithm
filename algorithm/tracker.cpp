@@ -47,11 +47,10 @@ void HumanTracker::startTracking()
 
         addPointToPath(3);
 
-        mergePointToObject(4, 12);
+        if (showObject) mergePointToObject(4, 12);
 
         t = ((double)getTickCount() - t)/getTickFrequency();
-        if (frame_count % 10 == 0)
-            putInfo("FPS " + std::to_string((int)(1/t)), 400);
+        if (frame_count % 10 == 0) putInfo("FPS " + std::to_string((int)(1/t)), 400);
 
         if (!showResult(false)) break;
     }
@@ -113,7 +112,7 @@ bool HumanTracker::showResult(bool stepByStep)
     imshow("directionMaskBGR", directionMask);
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
-    //add(new_color_frame, mergeMask, new_color_frame);
+    add(new_color_frame, mergeMask, new_color_frame);
     imshow("info", info);
     imshow("flow", new_color_frame);
     if (waitKey(pauseTime) == 27)
