@@ -76,13 +76,16 @@ private:
     void fillHSV2BGR();
     Scalar cvtAngleToBGR(int angle);
     void mergePointToObject(int queue_index, int chanels);
+    void collectPathInfo(int index);
+    void showPathInfo(int queue_index);
 
 private:
     bool running;
-    bool showPoint = true;
+    bool showPoint = false;
     bool showPath = false;
     bool showApproximanedPath = false;
-    bool showDirection = false;
+    bool showDirection = true;
+    bool showMergePoint = false;
 
 private:
     Mat old_frame;
@@ -102,6 +105,8 @@ private:
     vector<Scalar> angleToBGR;
     unsigned int frame_count;
     int queue_count;
+    int deletedGoodPathAmount;
+    int goodPathLifeTimeSum;
 };
 
 #endif // HUMANTRACKER_H
