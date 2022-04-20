@@ -78,14 +78,15 @@ private:
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
     void showPathInfo(int queue_index);
+    void updateMainStream(int queue_index);
 
 private:
     bool running;
     bool showPoint = false;
     bool showPath = false;
     bool showApproximanedPath = false;
-    bool showDirection = true;
-    bool showMergePoint = false;
+    bool showDirection = false;
+    bool showMergePoint = true;
 
 private:
     Mat old_frame;
@@ -96,6 +97,8 @@ private:
     Mat directionMask;
     Mat mergeMask;
     Mat info;
+    Mat mainStream;
+    Mat mainStreamCount;
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
     vector<FPoint> p0;

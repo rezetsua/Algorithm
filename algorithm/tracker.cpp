@@ -15,10 +15,12 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     directionMask = Mat::zeros(old_frame.size(), old_frame.type());
     mergeMask = Mat::zeros(old_frame.size(), old_frame.type());
+    mainStream = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
     info = Mat::zeros(old_frame.size(), old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
+    mainStreamCount = Mat::zeros(old_frame.size(), CV_32S);
 
     fillHSV2BGR();
     setDetector(detector_enum);
@@ -50,6 +52,8 @@ void HumanTracker::startTracking()
         addPointToPath(3);
 
         mergePointToObject(4, 12);
+
+        updateMainStream(5);
 
         showPathInfo(2);
 
@@ -107,12 +111,13 @@ void HumanTracker::filterAndDrawPoint()
         count++;
     }
     for (int i = 0; i < p1.size(); i++)
-        p0[i].pt = p1[i];
+        if (p1[i].x < old_frame.cols && p1[i].y < old_frame.rows)
+            p0[i].pt = p1[i];
 }
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 30;
+    int pauseTime = stepByStep ? 0 : 1;
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
@@ -192,6 +197,8 @@ void HumanTracker::setDetector(int detector_enum)
 
 void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
 {
+    //double t = (double)getTickCount();
+
     if (queue_count != queue_index)
         return;
 
@@ -206,6 +213,9 @@ void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
     }
     putInfo("Total point amount " + std::to_string(p0.size()), 1);
     //imshow("occupied area", point_mat);
+
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << t << endl;
 }
 
 void HumanTracker::fillPointMat(int blockSize)
@@ -218,6 +228,7 @@ void HumanTracker::fillPointMat(int blockSize)
 
 void HumanTracker::deleteStaticPoint(int queue_index)
 {
+//    double t = (double)getTickCount();
     if (queue_count != queue_index)
         return;
     int count = 0;
@@ -229,6 +240,8 @@ void HumanTracker::deleteStaticPoint(int queue_index)
         }
     }
     putInfo("Deleted static point " + std::to_string(count), 2);
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << t << endl;
 }
 
 void HumanTracker::putInfo(string text, int textY)
@@ -241,6 +254,7 @@ void HumanTracker::putInfo(string text, int textY)
 
 void HumanTracker::addPointToPath(int queue_index)
 {
+//    double t = (double)getTickCount();
     if (queue_count != queue_index)
         return;
     for (int i = 0; i < p0.size(); i++) {
@@ -249,6 +263,8 @@ void HumanTracker::addPointToPath(int queue_index)
     approximatePath();
     if (showPath)
         drawPointPath();
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << t << endl;
 }
 
 void HumanTracker::drawPointPath()
@@ -355,13 +371,13 @@ Scalar HumanTracker::cvtAngleToBGR(int angle)
 
 void HumanTracker::mergePointToObject(int queue_index, int chanels)
 {
+//    double t = (double)getTickCount();
     if (!showMergePoint)
         return;
 
     if (queue_count != queue_index)
         return;
 
-    double t = (double)getTickCount();
     // Draw point
     mergeMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     for (int i = 0; i < p0.size(); i++)
@@ -393,8 +409,8 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
     }
 
     cvtColor(mergeMaskHSV, mergeMask, COLOR_HSV2BGR);
-    t = ((double)getTickCount() - t)/getTickFrequency();
-    cout << t << endl;
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << t << endl;
 }
 
 void HumanTracker::collectPathInfo(int index)
@@ -414,6 +430,45 @@ void HumanTracker::showPathInfo(int queue_index)
     putInfo("Average path life time " + std::to_string(averagePathLifeTime), 4);
     goodPathLifeTimeSum = 0;
     deletedGoodPathAmount = 0;
+}
+
+void HumanTracker::updateMainStream(int queue_index)
+{
+//    double t = (double)getTickCount();
+    if (queue_count != queue_index)
+        return;
+
+    for (int i = 0; i < p0.size(); ++i) {
+        int x = static_cast<int>(p0[i].pt.x);
+        int y = static_cast<int>(p0[i].pt.y);
+
+        double b = mainStream.at<cv::Vec3b>(y, x)[0];
+        double g = mainStream.at<cv::Vec3b>(y, x)[1];
+        double r = mainStream.at<cv::Vec3b>(y, x)[2];
+
+        if (mainStreamCount.at<int>(y, x) > 500) {
+            cout << "aboba" << endl;
+            mainStreamCount.at<int>(y, x) -= 100;
+        }
+        int count = mainStreamCount.at<int>(y, x);
+
+        b = b * count + p0[i].color[0];
+        g = g * count + p0[i].color[1];
+        r = r * count + p0[i].color[2];
+
+        count = ++mainStreamCount.at<int>(y, x);
+
+        b /= count;
+        b /= count;
+        b /= count;
+
+        mainStream.at<cv::Vec3b>(y, x)[0] = b;
+        mainStream.at<cv::Vec3b>(y, x)[1] = g;
+        mainStream.at<cv::Vec3b>(y, x)[2] = r;
+    }
+    imshow("mainStream", mainStream);
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << t << endl;
 }
 
 FPoint::FPoint()
