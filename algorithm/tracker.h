@@ -35,8 +35,8 @@ public:
     FPoint(Point2f point, int originFrame);
 
     Scalar generateColor();
-    void updatePath();
-    void updateVelocity();
+    int updatePath();
+    int updateVelocity();
 
 public:
     Point2f pt;
@@ -83,10 +83,10 @@ private:
 private:
     bool running;
     bool showPoint = false;
-    bool showPath = false;
+    bool showPath = true;
     bool showApproximanedPath = false;
     bool showDirection = false;
-    bool showMergePoint = true;
+    bool showMergePoint = false;
 
 private:
     Mat old_frame;
@@ -110,6 +110,8 @@ private:
     int queue_count;
     int deletedGoodPathAmount;
     int goodPathLifeTimeSum;
+    int normalPointVelocityAmount;
+    int abnormalPointVelocityAmount;
 };
 
 #endif // HUMANTRACKER_H

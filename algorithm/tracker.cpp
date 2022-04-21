@@ -53,8 +53,6 @@ void HumanTracker::startTracking()
 
         mergePointToObject(4, 12);
 
-        updateMainStream(5);
-
         showPathInfo(2);
 
         t = ((double)getTickCount() - t)/getTickFrequency();
@@ -117,7 +115,7 @@ void HumanTracker::filterAndDrawPoint()
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 1;
+    int pauseTime = stepByStep ? 0 : 30;
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
@@ -257,9 +255,19 @@ void HumanTracker::addPointToPath(int queue_index)
 //    double t = (double)getTickCount();
     if (queue_count != queue_index)
         return;
+
+    normalPointVelocityAmount = 0;
+    abnormalPointVelocityAmount = 0;
+
     for (int i = 0; i < p0.size(); i++) {
-        p0[i].updatePath();
+        int ratio = p0[i].updatePath();
+        if (ratio < 0)
+            ++normalPointVelocityAmount;
+        else if (ratio > 0)
+            ++abnormalPointVelocityAmount;
     }
+    //cout << normalPointVelocityAmount << " " << abnormalPointVelocityAmount << endl;
+    cout << abs(static_cast<double>(abnormalPointVelocityAmount)/static_cast<double>(normalPointVelocityAmount)) << endl;
     approximatePath();
     if (showPath)
         drawPointPath();
@@ -506,22 +514,27 @@ Scalar FPoint::generateColor()
     return Scalar(r,g,b);
 }
 
-void FPoint::updatePath()
+int FPoint::updatePath()
 {
-    if (path.size() < 5)
+    if (path.size() < 10)
         path.push_back(pt);
     else {
         path.erase(path.begin());
         path.push_back(pt);
     }
-    updateVelocity();
+    return updateVelocity();
 }
 
-void FPoint::updateVelocity()
+int FPoint::updateVelocity()
 {
-    if (path.size() < 2)
-        return;
-    instantVelocity = cv::norm(path[path.size() - 1] - path[path.size() - 2]);
-    averageVelocity = cv::norm(path[path.size() - 1] - path[0]) / path.size();
+    if (path.size() < 5)
+        return 0;
+    instantVelocity = cv::norm(path[path.size() - 1] - path[path.size() - 6])/5.0;
+    averageVelocity = cv::arcLength(path, false) / (path.size() - 1);
+    //cout << instantVelocity << " " << averageVelocity << endl;
+
+    double ratio = abs(instantVelocity/averageVelocity - 1)*100;
+    //cout << "ratio " << ratio << endl;
+    return ratio < 20 ? -1 : 1;
 }
 
