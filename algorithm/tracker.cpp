@@ -529,12 +529,14 @@ int FPoint::updateVelocity()
 {
     if (path.size() < 5)
         return 0;
-    instantVelocity = cv::norm(path[path.size() - 1] - path[path.size() - 6])/5.0;
-    averageVelocity = cv::arcLength(path, false) / (path.size() - 1);
+    instantVelocity = cv::norm(path[path.size() - 1] - path[path.size() - 3])/2.0;
+    vector<Point2f> partPath = path;
+    partPath.erase(partPath.end() - 2, partPath.end());
+    averageVelocity = cv::arcLength(partPath, false) / (partPath.size() - 1);
     //cout << instantVelocity << " " << averageVelocity << endl;
 
     double ratio = abs(instantVelocity/averageVelocity - 1)*100;
     //cout << "ratio " << ratio << endl;
-    return ratio < 20 ? -1 : 1;
+    return ratio < 30 ? -1 : 1;
 }
 
