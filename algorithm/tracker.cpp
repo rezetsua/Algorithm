@@ -11,6 +11,8 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     queue_count = 1;
     deletedGoodPathAmount = 0;
     goodPathLifeTimeSum = 0;
+    averageVelocityRatio = 0;
+    abnormalOutliersFlag = 0;
 
     lineMask = Mat::zeros(old_frame.size(), old_frame.type());
     directionMask = Mat::zeros(old_frame.size(), old_frame.type());
@@ -18,7 +20,7 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     mainStream = Mat::zeros(old_frame.size(), old_frame.type());
     cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
 
-    info = Mat::zeros(old_frame.size(), old_frame.type());
+    info = Mat::zeros(480, 480, old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
     mainStreamCount = Mat::zeros(old_frame.size(), CV_32S);
 
@@ -253,6 +255,7 @@ void HumanTracker::putInfo(string text, int textY)
 void HumanTracker::addPointToPath(int queue_index)
 {
 //    double t = (double)getTickCount();
+
     if (queue_count != queue_index)
         return;
 
@@ -261,22 +264,48 @@ void HumanTracker::addPointToPath(int queue_index)
 
     for (int i = 0; i < p0.size(); i++) {
         int ratio = p0[i].updatePath();
+
         if (ratio < 0)
             ++normalPointVelocityAmount;
         else if (ratio > 0)
             ++abnormalPointVelocityAmount;
     }
-    //cout << normalPointVelocityAmount << " " << abnormalPointVelocityAmount << endl;
-    cout << abs(static_cast<double>(abnormalPointVelocityAmount)/static_cast<double>(normalPointVelocityAmount)) << endl;
+
+    if (normalPointVelocityAmount != 0) {
+        double currentVelocityRatio = static_cast<double>(abnormalPointVelocityAmount)
+                                      /static_cast<double>(normalPointVelocityAmount);
+
+        if (averageVelocityRatio != 0 && currentVelocityRatio/averageVelocityRatio > 2.0)
+            ++abnormalOutliersFlag;
+        else {
+            abnormalOutliersFlag = 0;
+            averageVelocityRatio *= averageVelocityRatioCount;
+            averageVelocityRatio += currentVelocityRatio;
+            ++averageVelocityRatioCount;
+            if (averageVelocityRatioCount > 50) {
+                averageVelocityRatio -= averageVelocityRatio / averageVelocityRatioCount;
+                --averageVelocityRatioCount;
+            }
+            averageVelocityRatio /= averageVelocityRatioCount;
+        }
+
+        abnormalOutliersFlag > 1 ? putInfo("ABNORMAL behavior", 6) : putInfo("Normal behavior", 6);
+        cout << currentVelocityRatio << "\t" << averageVelocityRatio << "\t" << averageVelocityRatioCount << endl;
+    }
+
+
     approximatePath();
-    if (showPath)
-        drawPointPath();
+    drawPointPath();
+
 //    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << t << endl;
+//    cout << "Time costs: " << t << endl;
 }
 
 void HumanTracker::drawPointPath()
 {
+    if (!showPath)
+        return;
+
     lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     for (int i = 0; i < p0.size(); i++) {
         // Filter
@@ -527,16 +556,20 @@ int FPoint::updatePath()
 
 int FPoint::updateVelocity()
 {
-    if (path.size() < 5)
+    int instancePointAmount = 3;
+    int ratioTreshold = 30;
+    if (path.size() < instancePointAmount * 2)
         return 0;
-    instantVelocity = cv::norm(path[path.size() - 1] - path[path.size() - 3])/2.0;
-    vector<Point2f> partPath = path;
-    partPath.erase(partPath.end() - 2, partPath.end());
-    averageVelocity = cv::arcLength(partPath, false) / (partPath.size() - 1);
-    //cout << instantVelocity << " " << averageVelocity << endl;
 
-    double ratio = abs(instantVelocity/averageVelocity - 1)*100;
-    //cout << "ratio " << ratio << endl;
-    return ratio < 30 ? -1 : 1;
+    vector<Point2f> instantPath = path;
+    instantPath.erase(instantPath.begin(), instantPath.end() - instancePointAmount);
+    instantVelocity = cv::arcLength(instantPath, false) / (instantPath.size() - 1);
+
+    vector<Point2f> averagePath = path;
+    averagePath.erase(averagePath.end() - instancePointAmount, averagePath.end());
+    averageVelocity = cv::arcLength(averagePath, false) / (averagePath.size() - 1);
+
+    double ratio = abs(instantVelocity/averageVelocity - 1) * 100;
+    return ratio < ratioTreshold ? -1 : 1;
 }
 

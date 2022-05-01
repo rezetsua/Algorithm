@@ -112,6 +112,9 @@ private:
     int goodPathLifeTimeSum;
     int normalPointVelocityAmount;
     int abnormalPointVelocityAmount;
+    double averageVelocityRatio;
+    int averageVelocityRatioCount;
+    int abnormalOutliersFlag;
 };
 
 #endif // HUMANTRACKER_H
