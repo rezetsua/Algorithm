@@ -275,7 +275,7 @@ void HumanTracker::addPointToPath(int queue_index)
         double currentVelocityRatio = static_cast<double>(abnormalPointVelocityAmount)
                                       /static_cast<double>(normalPointVelocityAmount);
 
-        if (averageVelocityRatio != 0 && currentVelocityRatio/averageVelocityRatio > 2.0)
+        if (averageVelocityRatio != 0 && currentVelocityRatio/averageVelocityRatio > 2.0 && averageVelocityRatioCount > 8)
             ++abnormalOutliersFlag;
         else {
             abnormalOutliersFlag = 0;
