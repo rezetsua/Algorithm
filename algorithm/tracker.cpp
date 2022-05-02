@@ -6,19 +6,20 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     if (!capture.isOpened())
         cerr << "Unable to open file!" << endl;
 
-    capture >> old_frame;
+    capture >> old_frame_color;
     frame_count = 1;
     queue_count = 1;
     deletedGoodPathAmount = 0;
     goodPathLifeTimeSum = 0;
     averageVelocityRatio = 0;
     abnormalOutliersFlag = 0;
+    averageVelocityRatioCount = 0;
 
-    lineMask = Mat::zeros(old_frame.size(), old_frame.type());
-    directionMask = Mat::zeros(old_frame.size(), old_frame.type());
-    mergeMask = Mat::zeros(old_frame.size(), old_frame.type());
-    mainStream = Mat::zeros(old_frame.size(), old_frame.type());
-    cvtColor(old_frame, old_frame, COLOR_BGR2GRAY);
+    lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    mergeMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    mainStream = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    cvtColor(old_frame_color, old_frame, COLOR_BGR2GRAY);
 
     info = Mat::zeros(480, 480, old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
@@ -45,7 +46,7 @@ void HumanTracker::startTracking()
 
         detectNewPoint(new_frame, 1);
 
-        calculateOpticalFlow();
+        calculateOpticalFlow(SPARSE_RLOF);
 
         filterAndDrawPoint();
 
@@ -83,16 +84,51 @@ bool HumanTracker::getNextFrame()
     return true;
 }
 
-void HumanTracker::calculateOpticalFlow()
+void HumanTracker::calculateOpticalFlow(int flow_enum)
 {
-    vector<float> err;
-    TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
+//    double t = (double)getTickCount();
+    if (flow_enum == LUCAS_KANADA_SPARSE) {
+        vector<float> err;
+        TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
+        vector<Point2f> point0;
+        for (int i = 0; i < p0.size(); i++)
+            point0.push_back(p0[i].pt);
 
-    vector<Point2f> point0;
-    for (int i = 0; i < p0.size(); i++)
-        point0.push_back(p0[i].pt);
+        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
+        int statusCount = 0;
+        for (int i = 0; i < status.size(); ++i)
+            if (status[i] == 0)
+                ++statusCount;
+        //cout << statusCount << endl;
+    }
 
-    calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
+    if (flow_enum == SPARSE_RLOF) {
+        vector<float> err;
+        vector<Point2f> point0;
+        optflow::RLOFOpticalFlowParameter *rlofParam = new optflow::RLOFOpticalFlowParameter();
+        rlofParam->solverType = optflow::ST_BILINEAR;
+        rlofParam->supportRegionType = optflow::SR_CROSS; //SR_FIXED
+        rlofParam->normSigma0 = std::numeric_limits<float>::max();
+        rlofParam->normSigma1 = std::numeric_limits<float>::max();
+        rlofParam->smallWinSize = 9;
+        rlofParam->largeWinSize = 21;
+        rlofParam->crossSegmentationThreshold = 25;
+        rlofParam->maxLevel = 4;
+        rlofParam->useInitialFlow = false;
+        rlofParam->useIlluminationModel = true;
+        rlofParam->useGlobalMotionPrior = true;
+        rlofParam->maxIteration = 30;
+        rlofParam->minEigenValue = 0.0001f;
+        rlofParam->globalMotionRansacThreshold = 10;
+        Ptr<optflow::RLOFOpticalFlowParameter> rlofParamPtr(rlofParam);
+        for (int i = 0; i < p0.size(); i++)
+            point0.push_back(p0[i].pt);
+
+        optflow::calcOpticalFlowSparseRLOF(old_frame_color, new_color_frame, point0, p1, status, err, rlofParamPtr, 0);
+        old_frame_color = new_color_frame.clone();
+    }
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << t << endl;
 }
 
 void HumanTracker::filterAndDrawPoint()
@@ -290,7 +326,7 @@ void HumanTracker::drawPointPath()
 
 void HumanTracker::approximatePath()
 {
-    if (showApproximanedPath)
+    if (showApproximatedPath)
         lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     if (showDirection)
         directionMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
@@ -306,7 +342,7 @@ void HumanTracker::approximatePath()
                          ? Scalar(0, p0[i].averageVelocity * 40, 255 - p0[i].averageVelocity * 40)
                          : Scalar(255, 0, 0);
             // Draw
-            if (showApproximanedPath)
+            if (showApproximatedPath)
                 for (int j = 1; j < apx.size(); j++)
                     line(lineMask, apx[j], apx[j - 1], color, 2);
             if (p0[i].goodPath)
@@ -331,7 +367,7 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
         return;
 
     Point2f pointDirection;
-    int predictDiv = 2;
+    int predictDiv = 4;
     float p0x = apx[apx.size() - 2].x;
     float p1x = apx[apx.size() - 1].x;
     float deltax = p1x - p0x;
@@ -482,6 +518,8 @@ void HumanTracker::trajectoryAnalysis(int queue_index)
 {
     //double t = (double)getTickCount();
 
+    if (!trajectoryAnalys)
+        return;
     if (queue_count != queue_index)
         return;
 

@@ -9,6 +9,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/video.hpp>
+#include <opencv2/optflow.hpp>
 
 #include <cmath>
 #include <random>
@@ -26,6 +27,14 @@ enum Detectors {
     MSER_Detector,
     KAZE_Detector,
     AKAZE_Detector
+};
+
+enum Flow {
+    LUCAS_KANADA_SPARSE = 0,
+    LUCAS_KANADA_DENSE,
+    FARNEBACK,
+    RLOF,
+    SPARSE_RLOF
 };
 
 class FPoint
@@ -61,7 +70,7 @@ public:
 
 private:
     bool getNextFrame();
-    void calculateOpticalFlow();
+    void calculateOpticalFlow(int flow_enum);
     void filterAndDrawPoint();
     bool showResult(bool stepByStep);
     void setDetector(int detector_enum);
@@ -84,12 +93,14 @@ private:
 private:
     bool running;
     bool showPoint = false;
-    bool showPath = true;
-    bool showApproximanedPath = false;
+    bool showPath = false;
+    bool showApproximatedPath = false;
     bool showDirection = false;
-    bool showMergePoint = false;
+    bool showMergePoint = true;
+    bool trajectoryAnalys = true;
 
 private:
+    Mat old_frame_color;
     Mat old_frame;
     Mat new_frame;
     Mat new_color_frame;
@@ -101,11 +112,11 @@ private:
     Mat mainStream;
     Mat mainStreamCount;
     VideoCapture capture;
+    vector<uchar> status;
     Ptr<cv::Feature2D> detector;
     vector<FPoint> p0;
     vector<Point2f> p1;
     vector<KeyPoint> new_point;
-    vector<uchar> status;
     vector<Scalar> angleToBGR;
     unsigned int frame_count;
     int queue_count;
