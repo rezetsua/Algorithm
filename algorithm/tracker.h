@@ -35,8 +35,8 @@ public:
     FPoint(Point2f point, int originFrame);
 
     Scalar generateColor();
-    int updatePath();
-    int updateVelocity();
+    void updatePath();
+    void updateVelocity();
 
 public:
     Point2f pt;
@@ -79,6 +79,7 @@ private:
     void collectPathInfo(int index);
     void showPathInfo(int queue_index);
     void updateMainStream(int queue_index);
+    void trajectoryAnalysis(int queue_index);
 
 private:
     bool running;

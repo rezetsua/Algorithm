@@ -53,6 +53,8 @@ void HumanTracker::startTracking()
 
         addPointToPath(3);
 
+        trajectoryAnalysis(3);
+
         mergePointToObject(4, 12);
 
         showPathInfo(2);
@@ -259,40 +261,8 @@ void HumanTracker::addPointToPath(int queue_index)
     if (queue_count != queue_index)
         return;
 
-    normalPointVelocityAmount = 0;
-    abnormalPointVelocityAmount = 0;
-
-    for (int i = 0; i < p0.size(); i++) {
-        int ratio = p0[i].updatePath();
-
-        if (ratio < 0)
-            ++normalPointVelocityAmount;
-        else if (ratio > 0)
-            ++abnormalPointVelocityAmount;
-    }
-
-    if (normalPointVelocityAmount != 0) {
-        double currentVelocityRatio = static_cast<double>(abnormalPointVelocityAmount)
-                                      /static_cast<double>(normalPointVelocityAmount);
-
-        if (averageVelocityRatio != 0 && currentVelocityRatio/averageVelocityRatio > 2.0 && averageVelocityRatioCount > 8)
-            ++abnormalOutliersFlag;
-        else {
-            abnormalOutliersFlag = 0;
-            averageVelocityRatio *= averageVelocityRatioCount;
-            averageVelocityRatio += currentVelocityRatio;
-            ++averageVelocityRatioCount;
-            if (averageVelocityRatioCount > 50) {
-                averageVelocityRatio -= averageVelocityRatio / averageVelocityRatioCount;
-                --averageVelocityRatioCount;
-            }
-            averageVelocityRatio /= averageVelocityRatioCount;
-        }
-
-        abnormalOutliersFlag > 1 ? putInfo("ABNORMAL behavior", 6) : putInfo("Normal behavior", 6);
-        cout << currentVelocityRatio << "\t" << averageVelocityRatio << "\t" << averageVelocityRatioCount << endl;
-    }
-
+    for (int i = 0; i < p0.size(); i++)
+        p0[i].updatePath();
 
     approximatePath();
     drawPointPath();
@@ -505,7 +475,53 @@ void HumanTracker::updateMainStream(int queue_index)
     }
     imshow("mainStream", mainStream);
 //    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << t << endl;
+    //    cout << t << endl;
+}
+
+void HumanTracker::trajectoryAnalysis(int queue_index)
+{
+    //double t = (double)getTickCount();
+
+    if (queue_count != queue_index)
+        return;
+
+    double abnormalTreshold = 30;
+    int initializationIterationsAmount = 8;
+    int averageSelectionSize = 50;
+    normalPointVelocityAmount = 0;
+    abnormalPointVelocityAmount = 0;
+
+    for (int i = 0; i < p0.size(); i++) {
+        if (p0[i].averageVelocity) {
+            double ratio = abs(p0[i].instantVelocity/p0[i].averageVelocity - 1) * 100;
+            ratio > abnormalTreshold ? ++abnormalPointVelocityAmount : ++normalPointVelocityAmount;
+        }
+    }
+
+    if (normalPointVelocityAmount != 0) {
+        double currentVelocityRatio = static_cast<double>(abnormalPointVelocityAmount)
+                                      /static_cast<double>(normalPointVelocityAmount);
+
+        if (averageVelocityRatio != 0 && currentVelocityRatio/averageVelocityRatio > 2.0 && averageVelocityRatioCount > initializationIterationsAmount)
+            ++abnormalOutliersFlag;
+        else {
+            abnormalOutliersFlag = 0;
+            averageVelocityRatio *= averageVelocityRatioCount;
+            averageVelocityRatio += currentVelocityRatio;
+            ++averageVelocityRatioCount;
+            if (averageVelocityRatioCount > averageSelectionSize) {
+                averageVelocityRatio -= averageVelocityRatio / averageVelocityRatioCount;
+                --averageVelocityRatioCount;
+            }
+            averageVelocityRatio /= averageVelocityRatioCount;
+        }
+
+        abnormalOutliersFlag > 1 ? putInfo("ABNORMAL behavior", 6) : putInfo("Normal behavior", 6);
+        cout << currentVelocityRatio << "\t" << averageVelocityRatio << "\t" << averageVelocityRatioCount << endl;
+    }
+
+//    t = ((double)getTickCount() - t)/getTickFrequency();
+//    cout << "Time costs: " << t << endl;
 }
 
 FPoint::FPoint()
@@ -543,7 +559,7 @@ Scalar FPoint::generateColor()
     return Scalar(r,g,b);
 }
 
-int FPoint::updatePath()
+void FPoint::updatePath()
 {
     if (path.size() < 10)
         path.push_back(pt);
@@ -554,12 +570,11 @@ int FPoint::updatePath()
     return updateVelocity();
 }
 
-int FPoint::updateVelocity()
+void FPoint::updateVelocity()
 {
     int instancePointAmount = 3;
-    int ratioTreshold = 30;
     if (path.size() < instancePointAmount * 2)
-        return 0;
+        return;
 
     vector<Point2f> instantPath = path;
     instantPath.erase(instantPath.begin(), instantPath.end() - instancePointAmount);
@@ -568,8 +583,5 @@ int FPoint::updateVelocity()
     vector<Point2f> averagePath = path;
     averagePath.erase(averagePath.end() - instancePointAmount, averagePath.end());
     averageVelocity = cv::arcLength(averagePath, false) / (averagePath.size() - 1);
-
-    double ratio = abs(instantVelocity/averageVelocity - 1) * 100;
-    return ratio < ratioTreshold ? -1 : 1;
 }
 
