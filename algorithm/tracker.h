@@ -30,11 +30,8 @@ enum Detectors {
 };
 
 enum Flow {
-    LUCAS_KANADA_SPARSE = 0,
-    LUCAS_KANADA_DENSE,
-    FARNEBACK,
-    RLOF,
-    SPARSE_RLOF
+    LUCAS_KANADA = 0,
+    RLOF
 };
 
 class FPoint
@@ -56,6 +53,7 @@ public:
     Scalar color;
     double instantVelocity;
     double averageVelocity;
+    int averageVelocityCount;
     vector<Point2f> path;
 };
 
@@ -93,10 +91,10 @@ private:
 private:
     bool running;
     bool showPoint = false;
-    bool showPath = false;
+    bool showPath = true;
     bool showApproximatedPath = false;
     bool showDirection = false;
-    bool showMergePoint = true;
+    bool showMergePoint = false;
     bool trajectoryAnalys = true;
 
 private:

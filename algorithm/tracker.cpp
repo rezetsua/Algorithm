@@ -46,7 +46,7 @@ void HumanTracker::startTracking()
 
         detectNewPoint(new_frame, 1);
 
-        calculateOpticalFlow(SPARSE_RLOF);
+        calculateOpticalFlow(RLOF);
 
         filterAndDrawPoint();
 
@@ -87,7 +87,7 @@ bool HumanTracker::getNextFrame()
 void HumanTracker::calculateOpticalFlow(int flow_enum)
 {
 //    double t = (double)getTickCount();
-    if (flow_enum == LUCAS_KANADA_SPARSE) {
+    if (flow_enum == LUCAS_KANADA) {
         vector<float> err;
         TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
         vector<Point2f> point0;
@@ -102,7 +102,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         //cout << statusCount << endl;
     }
 
-    if (flow_enum == SPARSE_RLOF) {
+    if (flow_enum == RLOF) {
         vector<float> err;
         vector<Point2f> point0;
         optflow::RLOFOpticalFlowParameter *rlofParam = new optflow::RLOFOpticalFlowParameter();
@@ -568,6 +568,7 @@ FPoint::FPoint()
     staticCount = 0;
     instantVelocity = 0;
     averageVelocity = 0;
+    averageVelocityCount = 0;
     originFrameCount = 0;
     goodPath = true;
     dirColor = false;
@@ -580,6 +581,7 @@ FPoint::FPoint(Point2f point, int originFrame)
     staticCount = 0;
     instantVelocity = 0;
     averageVelocity = 0;
+    averageVelocityCount = 0;
     originFrameCount = originFrame;
     goodPath = true;
     dirColor = false;
@@ -611,15 +613,16 @@ void FPoint::updatePath()
 void FPoint::updateVelocity()
 {
     int instancePointAmount = 3;
-    if (path.size() < instancePointAmount * 2)
+    if (path.size() < instancePointAmount + 2)
         return;
 
     vector<Point2f> instantPath = path;
     instantPath.erase(instantPath.begin(), instantPath.end() - instancePointAmount);
     instantVelocity = cv::arcLength(instantPath, false) / (instantPath.size() - 1);
 
-    vector<Point2f> averagePath = path;
-    averagePath.erase(averagePath.end() - instancePointAmount, averagePath.end());
-    averageVelocity = cv::arcLength(averagePath, false) / (averagePath.size() - 1);
+    averageVelocity *= averageVelocityCount;
+    averageVelocity += cv::norm(path[path.size() - instancePointAmount - 1] - path[path.size() - instancePointAmount - 2]);
+    ++averageVelocityCount;
+    averageVelocity /= averageVelocityCount;
 }
 
