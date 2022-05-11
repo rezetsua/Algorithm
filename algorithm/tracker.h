@@ -14,6 +14,7 @@
 #include <cmath>
 #include <random>
 #include <ctime>
+#include <stdint.h>
 
 using namespace cv;
 using namespace std;
@@ -43,7 +44,6 @@ public:
     Scalar generateColor();
     void updatePath();
     void updateVelocity();
-
 public:
     Point2f pt;
     int staticCount;
@@ -55,6 +55,7 @@ public:
     double averageVelocity;
     int averageVelocityCount;
     vector<Point2f> path;
+    vector<uint32_t> hot;
 };
 
 class HumanTracker
@@ -81,12 +82,14 @@ private:
     void approximatePath();
     void drawDirection(vector<Point2f> &apx, int index);
     void fillHSV2BGR();
+    void fillAngleToShift();
     Scalar cvtAngleToBGR(int angle);
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
     void showPathInfo(int queue_index);
     void updateMainStream(int queue_index);
     void trajectoryAnalysis(int queue_index);
+    void updateHOT(int queue_index);
 
 private:
     bool running;
@@ -116,6 +119,7 @@ private:
     vector<Point2f> p1;
     vector<KeyPoint> new_point;
     vector<Scalar> angleToBGR;
+    vector<int> angleToShift;
     unsigned int frame_count;
     int queue_count;
     int deletedGoodPathAmount;

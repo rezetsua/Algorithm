@@ -26,6 +26,7 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     mainStreamCount = Mat::zeros(old_frame.size(), CV_32S);
 
     fillHSV2BGR();
+    fillAngleToShift();
     setDetector(detector_enum);
     detectNewPoint(old_frame, 1);
 }
@@ -53,6 +54,8 @@ void HumanTracker::startTracking()
         deleteStaticPoint(2);
 
         addPointToPath(3);
+
+        updateHOT(3);
 
         trajectoryAnalysis(3);
 
@@ -400,6 +403,29 @@ void HumanTracker::fillHSV2BGR()
     }
 }
 
+void HumanTracker::fillAngleToShift()
+{
+    angleToShift.resize(360);
+    for (int i = 0; i < angleToShift.size(); ++i) {
+        if (i < 45)
+            angleToShift[i] = 0;
+        else if (i < 90)
+            angleToShift[i] = 1;
+        else if (i < 135)
+            angleToShift[i] = 2;
+        else if (i < 180)
+            angleToShift[i] = 3;
+        else if (i < 225)
+            angleToShift[i] = 4;
+        else if (i < 270)
+            angleToShift[i] = 5;
+        else if (i < 315)
+            angleToShift[i] = 6;
+        else if (i < 360)
+            angleToShift[i] = 7;
+    }
+}
+
 Scalar HumanTracker::cvtAngleToBGR(int angle)
 {
     if (angle > 360 || angle < 0)
@@ -491,7 +517,6 @@ void HumanTracker::updateMainStream(int queue_index)
         double r = mainStream.at<cv::Vec3b>(y, x)[2];
 
         if (mainStreamCount.at<int>(y, x) > 500) {
-            cout << "aboba" << endl;
             mainStreamCount.at<int>(y, x) -= 100;
         }
         int count = mainStreamCount.at<int>(y, x);
@@ -560,7 +585,44 @@ void HumanTracker::trajectoryAnalysis(int queue_index)
     }
 
 //    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << "Time costs: " << t << endl;
+    //    cout << "Time costs: " << t << endl;
+}
+
+void HumanTracker::updateHOT(int queue_index)
+{
+    if (queue_count != queue_index)
+        return;
+
+    uint32_t hstg = 0;
+    double magnStep = 8 / 4;
+    for (int i = 0; i < p0.size(); ++i) {
+        if (p0[i].path.size() < 2)
+            return;
+
+        Point2f pt1 = p0[i].path[p0[i].path.size() - 2];
+        Point2f pt2 = p0[i].path[p0[i].path.size() - 1];
+
+        double magn = norm(pt2 - pt1);
+        int magnShift;
+        for (int i = 0; i < 4; ++i)
+            if (magn < magnStep * (i + 1))
+                magnShift = i;
+
+        int angle = round(atan2(- (pt2.y - pt1.y), pt2.x - pt1.x) * 180 / 3.14);
+        if (angle < 0) angle = 360 + angle;
+        int angleShift = angleToShift[angle];
+
+        hstg = 8 * magnShift + angleShift;
+        //hstg = 1 << (8 * magnShift + angleShift);
+
+        if (p0[i].path.size() < 10)
+            p0[i].hot.push_back(hstg);
+        else {
+            p0[i].hot.erase(p0[i].hot.begin());
+            p0[i].hot.push_back(hstg);
+        }
+        //cout << "magn = " << magn << " angle = " << angle << " magnShift = " << magnShift << " angleShift = " << angleShift << " hist = " << hstg << endl;
+    }
 }
 
 FPoint::FPoint()
@@ -608,7 +670,7 @@ void FPoint::updatePath()
         path.erase(path.begin());
         path.push_back(pt);
     }
-    return updateVelocity();
+    updateVelocity();
 }
 
 void FPoint::updateVelocity()
