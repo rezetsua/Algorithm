@@ -44,9 +44,9 @@ void HumanTracker::startTracking()
 
         if (!getNextFrame()) break;
 
-        detectNewPoint(new_frame, 1);
-
         calculateOpticalFlow(RLOF);
+
+        detectNewPoint(new_frame, 1);
 
         filterAndDrawPoint();
 
@@ -145,6 +145,7 @@ void HumanTracker::filterAndDrawPoint()
         p0[i].staticCount = 0;
         // Draw
         if (showPoint)
+            //arrowedLine(new_color_frame, p0[i].pt, p1[i], p0[i].color, 1);
             circle(new_color_frame, p1[i], 2, p0[i].color, -1);
         count++;
     }
