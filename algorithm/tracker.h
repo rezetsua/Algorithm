@@ -19,6 +19,8 @@
 using namespace cv;
 using namespace std;
 
+const int TL = 10; // Tracklet length
+
 enum Detectors {
     GFTT_Detector = 0,
     FAST_Detector,
@@ -83,6 +85,7 @@ private:
     void drawDirection(vector<Point2f> &apx, int index);
     void fillHSV2BGR();
     void fillAngleToShift();
+    void fillCoordinateToPatchID();
     Scalar cvtAngleToBGR(int angle);
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
@@ -90,6 +93,7 @@ private:
     void updateMainStream(int queue_index);
     void trajectoryAnalysis(int queue_index);
     void updateHOT(int queue_index);
+    void calcPatchHOT(int queue_index);
 
 private:
     bool running;
@@ -112,6 +116,7 @@ private:
     Mat info;
     Mat mainStream;
     Mat mainStreamCount;
+    Mat coordinateToPatchID;
     VideoCapture capture;
     vector<uchar> status;
     Ptr<cv::Feature2D> detector;
@@ -120,6 +125,7 @@ private:
     vector<KeyPoint> new_point;
     vector<Scalar> angleToBGR;
     vector<int> angleToShift;
+    vector<vector<int>> patchHOT;
     unsigned int frame_count;
     int queue_count;
     int deletedGoodPathAmount;
@@ -129,6 +135,8 @@ private:
     double averageVelocityRatio;
     int averageVelocityRatioCount;
     int abnormalOutliersFlag;
+    int xPatchDim;
+    int yPatchDim;
 };
 
 #endif // HUMANTRACKER_H

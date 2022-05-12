@@ -14,6 +14,10 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     averageVelocityRatio = 0;
     abnormalOutliersFlag = 0;
     averageVelocityRatioCount = 0;
+    xPatchDim = 6;
+    yPatchDim = 4;
+    patchHOT.resize(xPatchDim * yPatchDim);
+    for (auto &vec : patchHOT) vec.resize(32 * TL);
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
@@ -23,10 +27,12 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
 
     info = Mat::zeros(480, 480, old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
+    coordinateToPatchID = Mat::zeros(old_frame.size(), old_frame.type());
     mainStreamCount = Mat::zeros(old_frame.size(), CV_32S);
 
     fillHSV2BGR();
     fillAngleToShift();
+    fillCoordinateToPatchID();
     setDetector(detector_enum);
     detectNewPoint(old_frame, 1);
 }
@@ -56,6 +62,8 @@ void HumanTracker::startTracking()
         addPointToPath(3);
 
         updateHOT(3);
+
+        calcPatchHOT(3);
 
         trajectoryAnalysis(3);
 
@@ -426,6 +434,19 @@ void HumanTracker::fillAngleToShift()
     }
 }
 
+void HumanTracker::fillCoordinateToPatchID()
+{
+    int patchWidth = coordinateToPatchID.cols / xPatchDim;
+    int patchHeight = coordinateToPatchID.rows / yPatchDim;
+
+    for (int j = 0; j < yPatchDim; ++j)
+        for (int i = 0; i < xPatchDim; ++i)
+            rectangle(coordinateToPatchID,
+                      Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
+                      Scalar(j * xPatchDim + i), -1);
+    imshow("coordinateToPatchID", coordinateToPatchID);
+}
+
 Scalar HumanTracker::cvtAngleToBGR(int angle)
 {
     if (angle > 360 || angle < 0)
@@ -615,13 +636,38 @@ void HumanTracker::updateHOT(int queue_index)
         hstg = 8 * magnShift + angleShift;
         //hstg = 1 << (8 * magnShift + angleShift);
 
-        if (p0[i].path.size() < 10)
+        if (p0[i].path.size() < TL)
             p0[i].hot.push_back(hstg);
         else {
             p0[i].hot.erase(p0[i].hot.begin());
             p0[i].hot.push_back(hstg);
         }
         //cout << "magn = " << magn << " angle = " << angle << " magnShift = " << magnShift << " angleShift = " << angleShift << " hist = " << hstg << endl;
+    }
+}
+
+void HumanTracker::calcPatchHOT(int queue_index)
+{
+    if (queue_count != queue_index)
+        return;
+
+    for (int i = 0; i < p0.size(); ++i) {
+        if (p0[i].path.size() < TL)
+            continue;
+
+        int cX = p0[i].path[0].x + (p0[i].path[9].x - p0[i].path[0].x)/2;
+        int cY = p0[i].path[0].y + (p0[i].path[9].y - p0[i].path[0].y)/2;
+
+        int patchID = coordinateToPatchID.at<uchar>(cY, cX);
+        for (int j = 0; j < p0[i].hot.size(); ++j) {
+            patchHOT.at(patchID).at(32 * j + p0[i].hot[j])++;
+        }
+    }
+
+    for (int i = 0; i < patchHOT.size(); ++i) {
+        for (int j = 0; j < patchHOT.at(i).size(); ++j)
+            cout << patchHOT.at(i).at(j);
+        cout << endl;
     }
 }
 
@@ -664,7 +710,7 @@ Scalar FPoint::generateColor()
 
 void FPoint::updatePath()
 {
-    if (path.size() < 10)
+    if (path.size() < TL)
         path.push_back(pt);
     else {
         path.erase(path.begin());
