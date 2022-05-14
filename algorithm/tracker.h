@@ -19,7 +19,11 @@
 using namespace cv;
 using namespace std;
 
+const int o = 8; // Orientation dimension
+const int m = 4; // Magnitude dimension
 const int TL = 10; // Tracklet length
+
+const int magnMax = 12; // Tracklet length
 
 enum Detectors {
     GFTT_Detector = 0,
@@ -60,6 +64,24 @@ public:
     vector<uint32_t> hot;
 };
 
+class Patch
+{
+public:
+    Patch();
+    void updateComm();
+
+    vector<int> lbt; // Local Binary Tracklet (o*m*L)
+    int lbtUpdateCount;
+    int comm; // Commutation
+
+private:
+    double getIndexWeight(int j, int jmax);
+    std::pair<int, int> getLocalIndex(int i);
+
+    vector<double> indexToAngle;
+    vector<double> indexToMagnitude;
+};
+
 class HumanTracker
 {
 public:
@@ -94,6 +116,7 @@ private:
     void trajectoryAnalysis(int queue_index);
     void updateHOT(int queue_index);
     void calcPatchHOT(int queue_index);
+    void calcPatchCommotion(int queue_index);
 
 private:
     bool running;
@@ -125,7 +148,7 @@ private:
     vector<KeyPoint> new_point;
     vector<Scalar> angleToBGR;
     vector<int> angleToShift;
-    vector<vector<int>> patchHOT;
+    vector<Patch> patches;
     unsigned int frame_count;
     int queue_count;
     int deletedGoodPathAmount;

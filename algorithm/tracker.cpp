@@ -16,8 +16,7 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     averageVelocityRatioCount = 0;
     xPatchDim = 6;
     yPatchDim = 4;
-    patchHOT.resize(xPatchDim * yPatchDim);
-    for (auto &vec : patchHOT) vec.resize(32 * TL);
+    patches.resize(xPatchDim * yPatchDim);
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
@@ -51,7 +50,7 @@ void HumanTracker::startTracking()
 
         if (!getNextFrame()) break;
 
-        calculateOpticalFlow(RLOF);
+        calculateOpticalFlow(LUCAS_KANADA);
 
         detectNewPoint(new_frame, 1);
 
@@ -66,6 +65,8 @@ void HumanTracker::startTracking()
         calcPatchHOT(3);
 
         trajectoryAnalysis(3);
+
+        calcPatchCommotion(3);
 
         mergePointToObject(4, 12);
 
@@ -161,13 +162,14 @@ void HumanTracker::filterAndDrawPoint()
         count++;
     }
     for (int i = 0; i < p1.size(); i++)
-        if (p1[i].x < old_frame.cols && p1[i].y < old_frame.rows)
+        if (p1[i].x < old_frame.cols && p1[i].y < old_frame.rows
+                && p1[i].x >= 0 && p1[i].y >= 0)
             p0[i].pt = p1[i];
 }
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 30;
+    int pauseTime = stepByStep ? 0 : 1;
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
@@ -389,7 +391,7 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
     float p1y = apx[apx.size() - 1].y;
     float deltay = p1y - p0y;
     pointDirection.y = p1y + deltay / predictDiv;
-    int angle = round(atan2(- deltay, deltax) * 180 / 3.14);
+    int angle = round(atan2(- deltay, deltax) * 180 / M_PI);
     if (angle < 0)
         angle = 360 + angle;
 
@@ -414,24 +416,10 @@ void HumanTracker::fillHSV2BGR()
 void HumanTracker::fillAngleToShift()
 {
     angleToShift.resize(360);
-    for (int i = 0; i < angleToShift.size(); ++i) {
-        if (i < 45)
-            angleToShift[i] = 0;
-        else if (i < 90)
-            angleToShift[i] = 1;
-        else if (i < 135)
-            angleToShift[i] = 2;
-        else if (i < 180)
-            angleToShift[i] = 3;
-        else if (i < 225)
-            angleToShift[i] = 4;
-        else if (i < 270)
-            angleToShift[i] = 5;
-        else if (i < 315)
-            angleToShift[i] = 6;
-        else if (i < 360)
-            angleToShift[i] = 7;
-    }
+    for (int i = 0; i < angleToShift.size(); ++i)
+        for (int j = o; j > 0; --j)
+            if (i < 360 / j)
+                angleToShift[i] = o - j;
 }
 
 void HumanTracker::fillCoordinateToPatchID()
@@ -602,7 +590,7 @@ void HumanTracker::trajectoryAnalysis(int queue_index)
         }
 
         abnormalOutliersFlag > 1 ? putInfo("ABNORMAL behavior", 6) : putInfo("Normal behavior", 6);
-        cout << currentVelocityRatio << "\t" << averageVelocityRatio << "\t" << averageVelocityRatioCount << endl;
+        //cout << currentVelocityRatio << "\t" << averageVelocityRatio << "\t" << averageVelocityRatioCount << endl;
     }
 
 //    t = ((double)getTickCount() - t)/getTickFrequency();
@@ -615,7 +603,7 @@ void HumanTracker::updateHOT(int queue_index)
         return;
 
     uint32_t hstg = 0;
-    double magnStep = 8 / 4;
+    double magnStep = magnMax / m;
     for (int i = 0; i < p0.size(); ++i) {
         if (p0[i].path.size() < 2)
             return;
@@ -624,17 +612,17 @@ void HumanTracker::updateHOT(int queue_index)
         Point2f pt2 = p0[i].path[p0[i].path.size() - 1];
 
         double magn = norm(pt2 - pt1);
-        int magnShift;
-        for (int i = 0; i < 4; ++i)
+        int magnShift = m - 1;
+        for (int i = 0; i < m; ++i)
             if (magn < magnStep * (i + 1))
                 magnShift = i;
 
-        int angle = round(atan2(- (pt2.y - pt1.y), pt2.x - pt1.x) * 180 / 3.14);
+        int angle = round(atan2(- (pt2.y - pt1.y), pt2.x - pt1.x) * 180 / M_PI);
         if (angle < 0) angle = 360 + angle;
         int angleShift = angleToShift[angle];
 
-        hstg = 8 * magnShift + angleShift;
-        //hstg = 1 << (8 * magnShift + angleShift);
+        hstg = o * magnShift + angleShift;
+        //hstg = 1 << (o * magnShift + angleShift);
 
         if (p0[i].path.size() < TL)
             p0[i].hot.push_back(hstg);
@@ -655,20 +643,40 @@ void HumanTracker::calcPatchHOT(int queue_index)
         if (p0[i].path.size() < TL)
             continue;
 
-        int cX = p0[i].path[0].x + (p0[i].path[9].x - p0[i].path[0].x)/2;
-        int cY = p0[i].path[0].y + (p0[i].path[9].y - p0[i].path[0].y)/2;
+        int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x)/2;
+        int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y)/2;
 
         int patchID = coordinateToPatchID.at<uchar>(cY, cX);
+        patches[patchID].lbtUpdateCount++;
+        if (patches[patchID].lbtUpdateCount > TL)
+            patches[patchID].lbtUpdateCount = 1;
+        if (patches[patchID].lbtUpdateCount != 1)
+            continue;
+
         for (int j = 0; j < p0[i].hot.size(); ++j) {
-            patchHOT.at(patchID).at(32 * j + p0[i].hot[j])++;
+            patches.at(patchID).lbt.at(o * m * j + p0[i].hot[j])++;
         }
     }
 
-    for (int i = 0; i < patchHOT.size(); ++i) {
-        for (int j = 0; j < patchHOT.at(i).size(); ++j)
-            cout << patchHOT.at(i).at(j);
-        cout << endl;
+//    for (int i = 0; i < patchHOT.size(); ++i) {
+//        for (int j = 0; j < patchHOT.at(i).size(); ++j)
+//            cout << patchHOT.at(i).at(j);
+//        cout << endl;
+    //    }
+}
+
+void HumanTracker::calcPatchCommotion(int queue_index)
+{
+    if (queue_count != queue_index)
+        return;
+
+    double commSum = 0;
+    for (int i = 0; i < patches.size(); ++i) {
+        patches[i].updateComm();
+        commSum += patches[i].comm;
+        cout << patches[i].comm << " ";
     }
+    cout << "\t" << commSum << endl;
 }
 
 FPoint::FPoint()
@@ -735,3 +743,71 @@ void FPoint::updateVelocity()
     averageVelocity /= averageVelocityCount;
 }
 
+
+Patch::Patch()
+{
+    comm = 0;
+    lbtUpdateCount = 0;
+    lbt.resize(o * m * TL);
+
+    indexToAngle.resize(o);
+    for (int i = 0; i < indexToAngle.size(); ++i)
+        indexToAngle[i] = (2 * M_PI / o) * i + M_PI / o;
+
+    indexToMagnitude.resize(m);
+    for (int i = 0; i < indexToMagnitude.size(); ++i)
+        indexToMagnitude[i] = (magnMax / m) * i + magnMax / (2.0 * m);
+}
+
+void Patch::updateComm()
+{
+    if (lbtUpdateCount != 1)
+        return;
+
+    comm = 0;
+
+    double L2 = 0;
+    for (int i = 0; i < lbt.size(); ++i) {
+        L2 += pow(lbt[i], 2);
+    }
+    L2 = sqrt(L2);
+
+    int jmax = 0;
+    for (int i = 0; i < lbt.size(); ++i) {
+        if (lbt[i] > lbt[jmax])
+            jmax = i;
+    }
+
+    for (int j = 0; j < lbt.size(); ++j) {
+        comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
+    }
+}
+
+double Patch::getIndexWeight(int j, int jmax)
+{
+    double sigO = 1.0 / o;
+    double sigM = 1.0 / m;
+
+    double oj = getLocalIndex(j).second;
+    double ojmax = getLocalIndex(jmax).second;
+
+    double mj = getLocalIndex(j).first;
+    double mjmax = getLocalIndex(jmax).first;
+
+    double A = 1 / (2 * M_PI * sigO * sigM);
+    double B = (pow(oj - ojmax, 2)) / (2 * pow(sigO, 2));
+    double C = (pow(mj - mjmax, 2)) / (2 * pow(sigM, 2));
+
+    double weight = A * exp(-B - C);
+    return weight;
+}
+
+std::pair<int, int> Patch::getLocalIndex(int i)
+{
+    int localHotIndex = i % (o * m);
+
+    int localMagnIndex = localHotIndex / o;
+    int localOrientIndex = localHotIndex % o;
+
+    return make_pair(localMagnIndex, localOrientIndex);
+}
