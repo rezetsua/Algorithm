@@ -67,17 +67,15 @@ public:
 class Patch
 {
 public:
-    Patch();
+    explicit Patch(Point2f pt);
     void updateComm();
-
-    vector<int> lbt; // Local Binary Tracklet (o*m*L)
-    int lbtUpdateCount;
-    int comm; // Commutation
-
-private:
     double getIndexWeight(int j, int jmax);
     std::pair<int, int> getLocalIndex(int i);
 
+    Point2f center;
+    vector<int> lbt; // Local Binary Tracklet (o*m*L)
+    int lbtUpdateCount;
+    double comm; // Commutation
     vector<double> indexToAngle;
     vector<double> indexToMagnitude;
 };
@@ -108,6 +106,8 @@ private:
     void fillHSV2BGR();
     void fillAngleToShift();
     void fillCoordinateToPatchID();
+    void fillGridMask();
+    void fillPatches();
     Scalar cvtAngleToBGR(int angle);
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
@@ -117,6 +117,7 @@ private:
     void updateHOT(int queue_index);
     void calcPatchHOT(int queue_index);
     void calcPatchCommotion(int queue_index);
+    void showPatchGist(int queue_index);
 
 private:
     bool running;
@@ -136,6 +137,7 @@ private:
     Mat lineMask;
     Mat directionMask;
     Mat mergeMask;
+    Mat gridMask;
     Mat info;
     Mat mainStream;
     Mat mainStreamCount;

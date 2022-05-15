@@ -16,12 +16,13 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     averageVelocityRatioCount = 0;
     xPatchDim = 6;
     yPatchDim = 4;
-    patches.resize(xPatchDim * yPatchDim);
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     mergeMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     mainStream = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    gridMask = Mat::zeros(old_frame_color.size(), CV_8UC1);
+
     cvtColor(old_frame_color, old_frame, COLOR_BGR2GRAY);
 
     info = Mat::zeros(480, 480, old_frame.type());
@@ -32,6 +33,8 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     fillHSV2BGR();
     fillAngleToShift();
     fillCoordinateToPatchID();
+    fillGridMask();
+    fillPatches();
     setDetector(detector_enum);
     detectNewPoint(old_frame, 1);
 }
@@ -67,6 +70,8 @@ void HumanTracker::startTracking()
         trajectoryAnalysis(3);
 
         calcPatchCommotion(3);
+
+        showPatchGist(3);
 
         mergePointToObject(4, 12);
 
@@ -169,10 +174,13 @@ void HumanTracker::filterAndDrawPoint()
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 1;
+    int pauseTime = stepByStep ? 0 : 30;
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
+    Mat grid = gridMask.clone();
+    cvtColor(grid, grid, COLOR_GRAY2BGR);
+    add(new_color_frame, grid, new_color_frame);
     imshow("info", info);
     imshow("flow", new_color_frame);
     if (waitKey(pauseTime) == 27)
@@ -417,9 +425,11 @@ void HumanTracker::fillAngleToShift()
 {
     angleToShift.resize(360);
     for (int i = 0; i < angleToShift.size(); ++i)
-        for (int j = o; j > 0; --j)
-            if (i < 360 / j)
-                angleToShift[i] = o - j;
+        for (int j = 0; j < o; ++j)
+            if (i < (360 / o) * (j + 1)) {
+                angleToShift[i] = j;
+                break;
+            }
 }
 
 void HumanTracker::fillCoordinateToPatchID()
@@ -433,6 +443,36 @@ void HumanTracker::fillCoordinateToPatchID()
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
                       Scalar(j * xPatchDim + i), -1);
     imshow("coordinateToPatchID", coordinateToPatchID);
+}
+
+void HumanTracker::fillGridMask()
+{
+    int xStep = gridMask.cols / xPatchDim;
+    int yStep = gridMask.rows / yPatchDim;
+    int x = xStep;
+    int y = yStep;
+    while (x < gridMask.cols) {
+        line(gridMask, Point2f(x, 0), Point2f(x, gridMask.rows), Scalar(255), 1);
+        x += xStep;
+    }
+    while (y < gridMask.rows) {
+        line(gridMask, Point2f(0, y), Point2f(gridMask.cols, y), Scalar(255), 1);
+        y += yStep;
+    }
+}
+
+void HumanTracker::fillPatches()
+{
+    for (int i = 0; i < xPatchDim * yPatchDim; ++i) {
+        int xIndex = i % xPatchDim;
+        int yIndex = i / xPatchDim;
+
+        int x = old_frame_color.cols / (2 * xPatchDim) + xIndex * old_frame_color.cols / xPatchDim;
+        int y = old_frame_color.rows / (2 * yPatchDim) + yIndex * old_frame_color.rows / yPatchDim;
+
+        patches.push_back(Patch(Point2f(x, y)));
+        circle(gridMask, patches[i].center, 2, Scalar(0, 255, 0), -1);
+    }
 }
 
 Scalar HumanTracker::cvtAngleToBGR(int angle)
@@ -614,8 +654,10 @@ void HumanTracker::updateHOT(int queue_index)
         double magn = norm(pt2 - pt1);
         int magnShift = m - 1;
         for (int i = 0; i < m; ++i)
-            if (magn < magnStep * (i + 1))
+            if (magn < (magnStep * (i + 1))) {
                 magnShift = i;
+                break;
+            }
 
         int angle = round(atan2(- (pt2.y - pt1.y), pt2.x - pt1.x) * 180 / M_PI);
         if (angle < 0) angle = 360 + angle;
@@ -646,6 +688,7 @@ void HumanTracker::calcPatchHOT(int queue_index)
         int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x)/2;
         int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y)/2;
 
+        // Add only different tracklet's part
         int patchID = coordinateToPatchID.at<uchar>(cY, cX);
         patches[patchID].lbtUpdateCount++;
         if (patches[patchID].lbtUpdateCount > TL)
@@ -677,6 +720,54 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         cout << patches[i].comm << " ";
     }
     cout << "\t" << commSum << endl;
+}
+
+void HumanTracker::showPatchGist(int queue_index)
+{
+    if (queue_count != queue_index)
+        return;
+
+    //+ бежим по патчам
+        //+ расчитываем центр патча на изображении
+        //+ считаем L2 норму
+        //+ бежим по LBT
+            // берем среднюю магнитуду текущей гистограммы
+            // берем среднюю ориентацию текущей гистограммы
+            // берем частоту текущей гистограммы -> нормализуем -> кодируем интенсивностью цвета
+            // отрисовываем относительно центра
+
+    Mat patchGist = Mat::zeros(gridMask.size(), gridMask.type());
+    add(patchGist, gridMask, patchGist);
+
+    for (int i = 0; i < patches.size(); ++i) {
+
+        double L2 = 0;
+        for (int j = 0; j < patches[i].lbt.size(); ++j) {
+            L2 += pow(patches[i].lbt[j], 2);
+        }
+        L2 = sqrt(L2);
+
+        double xLength = new_frame.cols / (xPatchDim * 2);
+        double yLength = new_frame.rows / (yPatchDim * 2);
+        double scaleM = fmin(xLength, yLength) / magnMax;
+
+        for (int j = 0; j < patches[i].lbt.size(); ++j) {
+            if (patches[i].lbt[j] == 0)
+                continue;
+
+            double oj = patches[i].indexToAngle[patches[i].getLocalIndex(j).second];
+            double mj = scaleM * patches[i].indexToMagnitude[patches[i].getLocalIndex(j).first];
+            double I = patches[i].lbt[j] / L2 * 255;
+
+            int x = mj * cos(oj);
+            int y = mj * sin(oj);
+            Point2f pt(patches[i].center.x + x, patches[i].center.y + y);
+
+            line(patchGist, patches[i].center, pt, Scalar(I), 2);
+        }
+    }
+
+    imshow("patchGist", patchGist);
 }
 
 FPoint::FPoint()
@@ -743,9 +834,9 @@ void FPoint::updateVelocity()
     averageVelocity /= averageVelocityCount;
 }
 
-
-Patch::Patch()
+Patch::Patch(Point2f pt)
 {
+    center = pt;
     comm = 0;
     lbtUpdateCount = 0;
     lbt.resize(o * m * TL);
@@ -779,27 +870,28 @@ void Patch::updateComm()
     }
 
     for (int j = 0; j < lbt.size(); ++j) {
-        comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
+        if (lbt[j] != 0)
+            comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
     }
 }
 
 double Patch::getIndexWeight(int j, int jmax)
 {
-    double sigO = 1.0 / o;
-    double sigM = 1.0 / m;
+    double sigO = 2 * M_PI / 6; //1.0 / o;
+    double sigM = magnMax / 6; //1.0 / m;
 
-    double oj = getLocalIndex(j).second;
-    double ojmax = getLocalIndex(jmax).second;
+    double oj = indexToAngle[getLocalIndex(j).second];
+    double ojmax = indexToAngle[getLocalIndex(jmax).second];
 
-    double mj = getLocalIndex(j).first;
-    double mjmax = getLocalIndex(jmax).first;
+    double mj = indexToMagnitude[getLocalIndex(j).first];
+    double mjmax = indexToMagnitude[getLocalIndex(jmax).first];
 
-    double A = 1 / (2 * M_PI * sigO * sigM);
+    double A = 1; // 1 / (2 * M_PI * sigO * sigM);
     double B = (pow(oj - ojmax, 2)) / (2 * pow(sigO, 2));
     double C = (pow(mj - mjmax, 2)) / (2 * pow(sigM, 2));
 
     double weight = A * exp(-B - C);
-    return weight;
+    return 1 - weight;
 }
 
 std::pair<int, int> Patch::getLocalIndex(int i)
