@@ -162,6 +162,8 @@ private:
     int abnormalOutliersFlag;
     int xPatchDim;
     int yPatchDim;
+    int dataCollectionCount;
+    double globalComm;
 };
 
 #endif // HUMANTRACKER_H

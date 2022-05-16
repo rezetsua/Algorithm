@@ -14,6 +14,8 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     averageVelocityRatio = 0;
     abnormalOutliersFlag = 0;
     averageVelocityRatioCount = 0;
+    dataCollectionCount = 0;
+    globalComm = 0;
     xPatchDim = 6;
     yPatchDim = 4;
 
@@ -707,13 +709,19 @@ void HumanTracker::calcPatchCommotion(int queue_index)
     if (queue_count != queue_index)
         return;
 
+    dataCollectionCount++;
+    cout << dataCollectionCount;
+//    if (dataCollectionCount < 50)
+//        return;
+
     double commSum = 0;
     for (int i = 0; i < patches.size(); ++i) {
         patches[i].updateComm();
         commSum += patches[i].comm;
         //cout << patches[i].comm << " ";
     }
-    //cout << "\t" << commSum << endl;
+    cout << "\t" << commSum << "\t" << commSum - globalComm << endl;
+    globalComm = commSum;
 }
 
 void HumanTracker::showPatchGist(int queue_index)
