@@ -181,7 +181,7 @@ bool HumanTracker::showResult(bool stepByStep)
     Mat grid = gridMask.clone();
     cvtColor(grid, grid, COLOR_GRAY2BGR);
     add(new_color_frame, grid, new_color_frame);
-    imshow("info", info);
+    //imshow("info", info);
     imshow("flow", new_color_frame);
     if (waitKey(pauseTime) == 27)
         return stepByStep;
@@ -442,7 +442,7 @@ void HumanTracker::fillCoordinateToPatchID()
             rectangle(coordinateToPatchID,
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
                       Scalar(j * xPatchDim + i), -1);
-    imshow("coordinateToPatchID", coordinateToPatchID);
+    //imshow("coordinateToPatchID", coordinateToPatchID);
 }
 
 void HumanTracker::fillGridMask()
@@ -700,12 +700,6 @@ void HumanTracker::calcPatchHOT(int queue_index)
             patches.at(patchID).lbt.at(o * m * j + p0[i].hot[j])++;
         }
     }
-
-//    for (int i = 0; i < patchHOT.size(); ++i) {
-//        for (int j = 0; j < patchHOT.at(i).size(); ++j)
-//            cout << patchHOT.at(i).at(j);
-//        cout << endl;
-    //    }
 }
 
 void HumanTracker::calcPatchCommotion(int queue_index)
@@ -717,24 +711,15 @@ void HumanTracker::calcPatchCommotion(int queue_index)
     for (int i = 0; i < patches.size(); ++i) {
         patches[i].updateComm();
         commSum += patches[i].comm;
-        cout << patches[i].comm << " ";
+        //cout << patches[i].comm << " ";
     }
-    cout << "\t" << commSum << endl;
+    //cout << "\t" << commSum << endl;
 }
 
 void HumanTracker::showPatchGist(int queue_index)
 {
     if (queue_count != queue_index)
         return;
-
-    //+ бежим по патчам
-        //+ расчитываем центр патча на изображении
-        //+ считаем L2 норму
-        //+ бежим по LBT
-            // берем среднюю магнитуду текущей гистограммы
-            // берем среднюю ориентацию текущей гистограммы
-            // берем частоту текущей гистограммы -> нормализуем -> кодируем интенсивностью цвета
-            // отрисовываем относительно центра
 
     Mat patchGist = Mat::zeros(gridMask.size(), gridMask.type());
     add(patchGist, gridMask, patchGist);
@@ -760,7 +745,7 @@ void HumanTracker::showPatchGist(int queue_index)
             double I = patches[i].lbt[j] / L2 * 255;
 
             int x = mj * cos(oj);
-            int y = mj * sin(oj);
+            int y = - mj * sin(oj);
             Point2f pt(patches[i].center.x + x, patches[i].center.y + y);
 
             line(patchGist, patches[i].center, pt, Scalar(I), 2);
