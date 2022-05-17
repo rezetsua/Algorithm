@@ -848,20 +848,17 @@ void Patch::updateComm()
     if (lbtUpdateCount != 1)
         return;
 
-    comm = 0;
-
     double L2 = 0;
-    for (int i = 0; i < lbt.size(); ++i) {
-        L2 += pow(lbt[i], 2);
-    }
-    L2 = sqrt(L2);
-
     int jmax = 0;
     for (int i = 0; i < lbt.size(); ++i) {
+        L2 += pow(lbt[i], 2);
+
         if (lbt[i] > lbt[jmax])
             jmax = i;
     }
+    L2 = sqrt(L2);
 
+    comm = 0;
     for (int j = 0; j < lbt.size(); ++j) {
         if (lbt[j] != 0)
             comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
@@ -870,8 +867,8 @@ void Patch::updateComm()
 
 double Patch::getIndexWeight(int j, int jmax)
 {
-    double sigO = 2 * M_PI / 6; //1.0 / o;
-    double sigM = magnMax / 6; //1.0 / m;
+    double sigO = 2 * M_PI / 12; //1.0 / o;
+    double sigM = magnMax / 12; //1.0 / m;
 
     double oj = indexToAngle[getLocalIndex(j).second];
     double ojmax = indexToAngle[getLocalIndex(jmax).second];
@@ -879,12 +876,21 @@ double Patch::getIndexWeight(int j, int jmax)
     double mj = indexToMagnitude[getLocalIndex(j).first];
     double mjmax = indexToMagnitude[getLocalIndex(jmax).first];
 
-    double A = 1; // 1 / (2 * M_PI * sigO * sigM);
-    double B = (pow(oj - ojmax, 2)) / (2 * pow(sigO, 2));
-    double C = (pow(mj - mjmax, 2)) / (2 * pow(sigM, 2));
+    double dMmax = mjmax > magnMax / 2 ? mjmax : magnMax - mjmax;
+    double dM = std::abs(mj - mjmax);
+    assert(dMmax >= dM);
 
-    double weight = A * exp(-B - C);
-    return 1 - weight;
+    double dOmax = M_PI;
+    double dO = std::abs(oj - ojmax);
+    dO = dO > M_PI ? 2 * M_PI - dO : dO;
+    assert(dOmax >= dO);
+
+    double A = 1; // 1 / (2 * M_PI * sigO * sigM);
+    double B = (pow(dO - dOmax, 2)) / (2 * pow(sigO, 2));
+    double C = (pow(dM - dMmax, 2)) / (2 * pow(sigM, 2));
+
+    double weight = A * exp(-1 * B - C);
+    return weight;
 }
 
 std::pair<int, int> Patch::getLocalIndex(int i)
