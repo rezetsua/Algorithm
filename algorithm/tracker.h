@@ -23,7 +23,7 @@ const int o = 8; // Orientation dimension
 const int m = 4; // Magnitude dimension
 const int TL = 10; // Tracklet length
 
-const int magnMax = 12; // Tracklet length
+const int magnMax = 8; // Tracklet length
 
 enum Detectors {
     GFTT_Detector = 0,

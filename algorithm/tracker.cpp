@@ -63,19 +63,19 @@ void HumanTracker::startTracking()
 
         deleteStaticPoint(2);
 
-        addPointToPath(3);
+        addPointToPath(2);
 
-        updateHOT(3);
+        updateHOT(2);
 
-        calcPatchHOT(3);
+        calcPatchHOT(2);
 
-        trajectoryAnalysis(3);
+        trajectoryAnalysis(2);
 
-        calcPatchCommotion(3);
+        calcPatchCommotion(2);
 
-        showPatchGist(3);
+        showPatchGist(2);
 
-        mergePointToObject(4, 12);
+        mergePointToObject(3, 12);
 
         showPathInfo(2);
 
@@ -98,7 +98,7 @@ bool HumanTracker::getNextFrame()
     cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
     frame_count++;
     queue_count++;
-    if (queue_count > 5)
+    if (queue_count > 3)
         queue_count = 1;
     return true;
 }
@@ -729,14 +729,19 @@ void HumanTracker::showPatchGist(int queue_index)
     if (queue_count != queue_index)
         return;
 
+    bool L2Mode = false;
+
     Mat patchGist = Mat::zeros(gridMask.size(), gridMask.type());
     add(patchGist, gridMask, patchGist);
 
     for (int i = 0; i < patches.size(); ++i) {
 
+        int jmax = -1;
         double L2 = 0;
         for (int j = 0; j < patches[i].lbt.size(); ++j) {
             L2 += pow(patches[i].lbt[j], 2);
+            if (patches[i].lbt[j] > patches[i].lbt[jmax])
+                jmax = j;
         }
         L2 = sqrt(L2);
 
@@ -750,10 +755,23 @@ void HumanTracker::showPatchGist(int queue_index)
 
             double oj = patches[i].indexToAngle[patches[i].getLocalIndex(j).second];
             double mj = scaleM * patches[i].indexToMagnitude[patches[i].getLocalIndex(j).first];
-            double I = patches[i].lbt[j] / L2 * 255;
+            double I = 255.0 * static_cast<double>(patches[i].lbt[j])
+                     / (L2Mode ? L2 : patches[i].lbt[jmax]);
 
             int x = mj * cos(oj);
             int y = - mj * sin(oj);
+            Point2f pt(patches[i].center.x + x, patches[i].center.y + y);
+
+            line(patchGist, patches[i].center, pt, Scalar(I), 2);
+        }
+
+        if (jmax != -1) {
+            double ojmax = patches[i].indexToAngle[patches[i].getLocalIndex(jmax).second];
+            double mjmax = scaleM * patches[i].indexToMagnitude[patches[i].getLocalIndex(jmax).first];
+            double I = L2Mode ? 255.0 / L2 : 255;
+
+            int x = mjmax * cos(ojmax);
+            int y = - mjmax * sin(ojmax);
             Point2f pt(patches[i].center.x + x, patches[i].center.y + y);
 
             line(patchGist, patches[i].center, pt, Scalar(I), 2);
@@ -867,8 +885,8 @@ void Patch::updateComm()
 
 double Patch::getIndexWeight(int j, int jmax)
 {
-    double sigO = 2 * M_PI / 12; //1.0 / o;
-    double sigM = magnMax / 12; //1.0 / m;
+    double sigO = 2 * M_PI / 12.0; //1.0 / o;
+    double sigM = magnMax / 12.0; //1.0 / m;
 
     double oj = indexToAngle[getLocalIndex(j).second];
     double ojmax = indexToAngle[getLocalIndex(jmax).second];
