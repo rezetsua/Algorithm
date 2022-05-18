@@ -21,7 +21,7 @@ using namespace std;
 
 const int o = 8; // Orientation dimension
 const int m = 4; // Magnitude dimension
-const int TL = 10; // Tracklet length
+const int TL = 5; // Tracklet length
 
 const int magnMax = 8; // Tracklet length
 
@@ -118,6 +118,7 @@ private:
     void calcPatchHOT(int queue_index);
     void calcPatchCommotion(int queue_index);
     void showPatchGist(int queue_index);
+    void showPatchComm(int queue_index);
 
 private:
     bool running;
@@ -142,6 +143,7 @@ private:
     Mat mainStream;
     Mat mainStreamCount;
     Mat coordinateToPatchID;
+    Mat patchCommMask;
     VideoCapture capture;
     vector<uchar> status;
     Ptr<cv::Feature2D> detector;

@@ -23,6 +23,7 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     mergeMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     mainStream = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    patchCommMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     gridMask = Mat::zeros(old_frame_color.size(), CV_8UC1);
 
     cvtColor(old_frame_color, old_frame, COLOR_BGR2GRAY);
@@ -74,6 +75,8 @@ void HumanTracker::startTracking()
         calcPatchCommotion(2);
 
         showPatchGist(2);
+
+        showPatchComm(2);
 
         mergePointToObject(3, 12);
 
@@ -177,6 +180,7 @@ void HumanTracker::filterAndDrawPoint()
 bool HumanTracker::showResult(bool stepByStep)
 {
     int pauseTime = stepByStep ? 0 : 30;
+    add(new_color_frame, patchCommMask, new_color_frame);
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
@@ -710,15 +714,18 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         return;
 
     dataCollectionCount++;
-    cout << dataCollectionCount;
+    cout << dataCollectionCount << "\t";
+    cout << fixed;
+    cout.precision(2);
 //    if (dataCollectionCount < 50)
 //        return;
+
 
     double commSum = 0;
     for (int i = 0; i < patches.size(); ++i) {
         patches[i].updateComm();
         commSum += patches[i].comm;
-        //cout << patches[i].comm << " ";
+        cout << patches[i].comm << " ";
     }
     cout << "\t" << commSum << "\t" << commSum - globalComm << endl;
     globalComm = commSum;
@@ -779,6 +786,30 @@ void HumanTracker::showPatchGist(int queue_index)
     }
 
     imshow("patchGist", patchGist);
+}
+
+void HumanTracker::showPatchComm(int queue_index)
+{
+    if (queue_count != queue_index)
+        return;
+
+    int patchWidth = patchCommMask.cols / xPatchDim;
+    int patchHeight = patchCommMask.rows / yPatchDim;
+
+    patchCommMask = Mat::zeros(patchCommMask.size(), patchCommMask.type());
+    for (int j = 0; j < yPatchDim; ++j)
+        for (int i = 0; i < xPatchDim; ++i) {
+            double maxComm = 0.25;
+            double r = 255.0 * patches[j * xPatchDim + i].comm / maxComm;
+            rectangle(patchCommMask,
+                      Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
+                      Scalar(255 - r, 0, r), -1);
+        }
+    Mat patchCommMaskShow = patchCommMask.clone();
+    Mat grid = gridMask.clone();
+    cvtColor(grid, grid, COLOR_GRAY2BGR);
+    add(patchCommMaskShow, grid, patchCommMaskShow);
+    imshow("patchCommMaskShow", patchCommMaskShow);
 }
 
 FPoint::FPoint()
