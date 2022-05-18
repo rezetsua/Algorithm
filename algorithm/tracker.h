@@ -54,6 +54,7 @@ public:
     Point2f pt;
     int staticCount;
     int originFrameCount;
+    int newHotCount;
     bool goodPath;
     bool dirColor;
     Scalar color;
@@ -74,7 +75,7 @@ public:
 
     Point2f center;
     vector<int> lbt; // Local Binary Tracklet (o*m*L)
-    int lbtUpdateCount;
+    vector<int> lbtLifeTime;
     double comm; // Commutation
     vector<double> indexToAngle;
     vector<double> indexToMagnitude;

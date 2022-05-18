@@ -66,11 +66,11 @@ void HumanTracker::startTracking()
 
         addPointToPath(2);
 
+        //trajectoryAnalysis(2);
+
         updateHOT(2);
 
         calcPatchHOT(2);
-
-        trajectoryAnalysis(2);
 
         calcPatchCommotion(2);
 
@@ -672,6 +672,10 @@ void HumanTracker::updateHOT(int queue_index)
         hstg = o * magnShift + angleShift;
         //hstg = 1 << (o * magnShift + angleShift);
 
+        p0[i].newHotCount++;
+        if (p0[i].newHotCount > TL)
+            p0[i].newHotCount = 1;
+
         if (p0[i].path.size() < TL)
             p0[i].hot.push_back(hstg);
         else {
@@ -688,22 +692,17 @@ void HumanTracker::calcPatchHOT(int queue_index)
         return;
 
     for (int i = 0; i < p0.size(); ++i) {
-        if (p0[i].path.size() < TL)
+        if (p0[i].newHotCount != TL)
             continue;
 
         int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x)/2;
         int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y)/2;
 
-        // Add only different tracklet's part
         int patchID = coordinateToPatchID.at<uchar>(cY, cX);
-        patches[patchID].lbtUpdateCount++;
-        if (patches[patchID].lbtUpdateCount > TL)
-            patches[patchID].lbtUpdateCount = 1;
-        if (patches[patchID].lbtUpdateCount != 1)
-            continue;
 
         for (int j = 0; j < p0[i].hot.size(); ++j) {
             patches.at(patchID).lbt.at(o * m * j + p0[i].hot[j])++;
+            patches.at(patchID).lbtLifeTime.at(o * m * j + p0[i].hot[j]) = 0;
         }
     }
 }
@@ -820,6 +819,7 @@ FPoint::FPoint()
     averageVelocity = 0;
     averageVelocityCount = 0;
     originFrameCount = 0;
+    newHotCount = 0;
     goodPath = true;
     dirColor = false;
     color = generateColor();
@@ -833,6 +833,7 @@ FPoint::FPoint(Point2f point, int originFrame)
     averageVelocity = 0;
     averageVelocityCount = 0;
     originFrameCount = originFrame;
+    newHotCount = 0;
     goodPath = true;
     dirColor = false;
     color = generateColor();
@@ -880,8 +881,8 @@ Patch::Patch(Point2f pt)
 {
     center = pt;
     comm = 0;
-    lbtUpdateCount = 0;
     lbt.resize(o * m * TL);
+    lbtLifeTime.resize(o * m * TL);
 
     indexToAngle.resize(o);
     for (int i = 0; i < indexToAngle.size(); ++i)
@@ -894,9 +895,6 @@ Patch::Patch(Point2f pt)
 
 void Patch::updateComm()
 {
-    if (lbtUpdateCount != 1)
-        return;
-
     double L2 = 0;
     int jmax = 0;
     for (int i = 0; i < lbt.size(); ++i) {
@@ -909,8 +907,13 @@ void Patch::updateComm()
 
     comm = 0;
     for (int j = 0; j < lbt.size(); ++j) {
-        if (lbt[j] != 0)
+        if (lbt[j] != 0) {
+            if (lbtLifeTime[j] > 10)
+                if (lbt[j] > 0)
+                    lbt[j]--;
             comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
+            lbtLifeTime[j]++;
+        }
     }
 }
 
