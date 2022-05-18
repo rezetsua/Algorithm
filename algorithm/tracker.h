@@ -73,6 +73,7 @@ public:
     double getIndexWeight(int j, int jmax);
     std::pair<int, int> getLocalIndex(int i);
 
+    bool isEmpty;
     Point2f center;
     vector<int> lbt; // Local Binary Tracklet (o*m*L)
     vector<int> lbtLifeTime;
@@ -120,6 +121,7 @@ private:
     void calcPatchCommotion(int queue_index);
     void showPatchGist(int queue_index);
     void showPatchComm(int queue_index);
+    void patchInit(int index);
 
 private:
     bool running;
@@ -128,7 +130,7 @@ private:
     bool showApproximatedPath = false;
     bool showDirection = false;
     bool showMergePoint = false;
-    bool trajectoryAnalys = true;
+    bool trajectoryAnalys = false;
 
 private:
     Mat old_frame_color;

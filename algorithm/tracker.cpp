@@ -66,7 +66,7 @@ void HumanTracker::startTracking()
 
         addPointToPath(2);
 
-        //trajectoryAnalysis(2);
+        trajectoryAnalysis(2);
 
         updateHOT(2);
 
@@ -699,6 +699,8 @@ void HumanTracker::calcPatchHOT(int queue_index)
         int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y)/2;
 
         int patchID = coordinateToPatchID.at<uchar>(cY, cX);
+        if (patches.at(patchID).isEmpty)
+            patchInit(patchID);
 
         for (int j = 0; j < p0[i].hot.size(); ++j) {
             patches.at(patchID).lbt.at(o * m * j + p0[i].hot[j])++;
@@ -811,6 +813,33 @@ void HumanTracker::showPatchComm(int queue_index)
     imshow("patchCommMaskShow", patchCommMaskShow);
 }
 
+void HumanTracker::patchInit(int index)
+{
+    vector<int> neighbors;
+    if (index % xPatchDim != 0)
+        neighbors.push_back(index - 1);
+    if ((index + 1) % xPatchDim != 0)
+        neighbors.push_back(index + 1);
+    if (index - xPatchDim >= 0)
+        neighbors.push_back(index - xPatchDim);
+    if (index + xPatchDim < xPatchDim * yPatchDim)
+        neighbors.push_back(index + xPatchDim);
+
+    for (int i = 0; i < neighbors.size(); i++) {
+        if (patches.at(neighbors[i]).isEmpty)
+            continue;
+
+        int jmax = 0;
+        for (int j = 0; j < patches.at(neighbors[i]).lbt.size(); ++j) {
+            if (patches.at(neighbors[i]).lbt[j] > patches.at(neighbors[i]).lbt[jmax])
+                jmax = j;
+        }
+        patches.at(index).lbt[jmax] = patches.at(neighbors[i]).lbt[jmax];
+        patches.at(index).lbtLifeTime[jmax] = 0;
+    }
+    patches.at(index).isEmpty = false;
+}
+
 FPoint::FPoint()
 {
     pt = Point2f(0, 0);
@@ -879,6 +908,7 @@ void FPoint::updateVelocity()
 
 Patch::Patch(Point2f pt)
 {
+    isEmpty = true;
     center = pt;
     comm = 0;
     lbt.resize(o * m * TL);
@@ -904,11 +934,12 @@ void Patch::updateComm()
             jmax = i;
     }
     L2 = sqrt(L2);
+    isEmpty = (L2 < 1);
 
     comm = 0;
     for (int j = 0; j < lbt.size(); ++j) {
         if (lbt[j] != 0) {
-            if (lbtLifeTime[j] > 10)
+            if (lbtLifeTime[j] > 5)
                 if (lbt[j] > 0)
                     lbt[j]--;
             comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
