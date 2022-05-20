@@ -38,6 +38,7 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     fillCoordinateToPatchID();
     fillGridMask();
     fillPatches();
+    fillGroundTruth(filename);
     setDetector(detector_enum);
     detectNewPoint(old_frame, 1);
 }
@@ -179,7 +180,7 @@ void HumanTracker::filterAndDrawPoint()
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 30;
+    int pauseTime = stepByStep ? 0 : 1;
     add(new_color_frame, patchCommMask, new_color_frame);
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
@@ -481,6 +482,22 @@ void HumanTracker::fillPatches()
     }
 }
 
+void HumanTracker::fillGroundTruth(string filename)
+{
+    size_t found = filename.find_last_of(".");
+    filename.erase(found + 1, filename.size());
+    filename.append("txt");
+
+    ifstream f(filename);
+    stringstream ss;
+    ss << f.rdbuf();
+    string str = ss.str();
+
+    groundTruth.resize(str.size());
+    for (int i = 0; i < str.size(); ++i)
+        groundTruth[i] = static_cast<int>(str[i]) - 48;
+}
+
 Scalar HumanTracker::cvtAngleToBGR(int angle)
 {
     if (angle > 360 || angle < 0)
@@ -726,9 +743,11 @@ void HumanTracker::calcPatchCommotion(int queue_index)
     for (int i = 0; i < patches.size(); ++i) {
         patches[i].updateComm();
         commSum += patches[i].comm;
-        cout << patches[i].comm << " ";
+        //cout << patches[i].comm << " ";
     }
-    cout << "\t" << commSum << "\t" << commSum - globalComm << endl;
+    prob.push_back(commSum);
+    truth.push_back(groundTruth[frame_count]);
+    cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
     globalComm = commSum;
 }
 

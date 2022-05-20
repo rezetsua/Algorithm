@@ -15,6 +15,7 @@
 #include <random>
 #include <ctime>
 #include <stdint.h>
+#include <fstream>
 
 using namespace cv;
 using namespace std;
@@ -110,6 +111,7 @@ private:
     void fillCoordinateToPatchID();
     void fillGridMask();
     void fillPatches();
+    void fillGroundTruth(string filename);
     Scalar cvtAngleToBGR(int angle);
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
@@ -123,7 +125,7 @@ private:
     void showPatchComm(int queue_index);
     void patchInit(int index);
 
-private:
+public:
     bool running;
     bool showPoint = false;
     bool showPath = true;
@@ -131,6 +133,9 @@ private:
     bool showDirection = false;
     bool showMergePoint = false;
     bool trajectoryAnalys = false;
+
+    vector<double> prob;
+    vector<int> truth;
 
 private:
     Mat old_frame_color;
@@ -147,6 +152,7 @@ private:
     Mat mainStreamCount;
     Mat coordinateToPatchID;
     Mat patchCommMask;
+    vector<int> angleToShift;
     VideoCapture capture;
     vector<uchar> status;
     Ptr<cv::Feature2D> detector;
@@ -154,8 +160,8 @@ private:
     vector<Point2f> p1;
     vector<KeyPoint> new_point;
     vector<Scalar> angleToBGR;
-    vector<int> angleToShift;
     vector<Patch> patches;
+    vector<int> groundTruth;
     unsigned int frame_count;
     int queue_count;
     int deletedGoodPathAmount;
