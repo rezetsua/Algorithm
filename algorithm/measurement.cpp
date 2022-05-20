@@ -8,7 +8,7 @@ Measurement::Measurement()
 void Measurement::ROC(const Mat &probs, const Mat &truth, vector<Point2f> &roc, int N, const float eps)
 {
     double errDiff = 1;
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i <= N; i++) {
         float thresh = float(N - i) / N;
         float TP = countNonZero((probs >  thresh) & (truth >  eps));
         float TN = countNonZero((probs <= thresh) & (truth <= eps));
@@ -23,7 +23,6 @@ void Measurement::ROC(const Mat &probs, const Mat &truth, vector<Point2f> &roc, 
         }
         roc.push_back(Point2f(FPR, TPR));
     }
-    roc.push_back(Point2f(1, 1));
 }
 
 float Measurement::AUC(vector<Point2f> &roc)
@@ -46,4 +45,22 @@ void Measurement::drawCurve(vector<Point2f> &roc, Mat &img, const Scalar &color)
             line(img, prev, cur, color, 1);
         prev = cur;
     }
+}
+
+void Measurement::exportToFile(vector<double> &input, string output)
+{
+    ofstream fout(output);
+    fout << fixed;
+    fout.precision(3);
+    for (int i = 0; i < input.size(); ++i)
+        fout << input[i] << endl;
+    fout.close();
+}
+
+void Measurement::exportToFile(vector<int> &input, string output)
+{
+    ofstream fout(output);
+    for (int i = 0; i < input.size(); ++i)
+        fout << input[i] << endl;
+    fout.close();
 }

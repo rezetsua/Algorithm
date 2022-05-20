@@ -6,6 +6,8 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include <fstream>
+
 using namespace cv;
 using namespace std;
 
@@ -14,9 +16,11 @@ class Measurement
 public:
     Measurement();
 
-    void ROC(const Mat &probs, const Mat &truth, vector<Point2f> &roc, int N, const float eps=1e-1);
+    void ROC(const Mat &probs, const Mat &truth, vector<Point2f> &roc, int N, const float eps = 0.5);
     float AUC(vector<Point2f> &roc);
     void drawCurve(vector<Point2f> &roc, Mat &img, const Scalar &color);
+    void exportToFile(vector<double> &input, string output);
+    void exportToFile(vector<int> &input, string output);
 
 public:
     double EER;

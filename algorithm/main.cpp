@@ -4,7 +4,7 @@
 int main()
 {
     // Tracking
-    string filename = "/home/urii/Документы/DataSet/scene1.avi";
+    string filename = "/home/urii/Документы/DataSet/scene3.avi";
     HumanTracker tracker(filename, Detectors::GFTT_Detector);
     tracker.startTracking();
 
@@ -15,7 +15,10 @@ int main()
     Mat probs(tracker.prob);
     Mat truth(tracker.truth);
 
-    m.ROC(probs, truth, roc, 10000);
+    m.exportToFile(tracker.prob, "/home/urii/Документы/DataSet/proba.txt");
+    m.exportToFile(tracker.truth, "/home/urii/Документы/DataSet/truth.txt");
+
+    m.ROC(probs, truth, roc, 1e3);
     Mat roc_draw(480, 480, CV_8UC3, Scalar::all(255));
     m.drawCurve(roc, roc_draw, Scalar(255, 0, 0));
     line(roc_draw, Point2f(0, 0), Point2f(roc_draw.cols, roc_draw.rows), Scalar(0, 255, 0), 1);
