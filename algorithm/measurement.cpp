@@ -8,7 +8,7 @@ Measurement::Measurement()
 void Measurement::ROC(const Mat &probs, const Mat &truth, vector<Point2f> &roc, int N, const float eps)
 {
     double errDiff = 1;
-    for (int i = 0; i <= N; i++) {
+    for (int i = 0; i < N; i++) {
         float thresh = float(N - i) / N;
         float TP = countNonZero((probs >  thresh) & (truth >  eps));
         float TN = countNonZero((probs <= thresh) & (truth <= eps));
@@ -23,6 +23,7 @@ void Measurement::ROC(const Mat &probs, const Mat &truth, vector<Point2f> &roc, 
         }
         roc.push_back(Point2f(FPR, TPR));
     }
+    roc.push_back(Point2f(1, 1));
 }
 
 float Measurement::AUC(vector<Point2f> &roc)
@@ -51,7 +52,7 @@ void Measurement::exportToFile(vector<double> &input, string output)
 {
     ofstream fout(output);
     fout << fixed;
-    fout.precision(3);
+    fout.precision(32);
     for (int i = 0; i < input.size(); ++i)
         fout << input[i] << endl;
     fout.close();

@@ -97,7 +97,7 @@ void HumanTracker::startTracking()
 
         showPatchComm(2);
 
-        mergePointToObject(3, 12);
+        //mergePointToObject(3, 12);
 
         showPathInfo(2);
 
@@ -120,7 +120,7 @@ bool HumanTracker::getNextFrame()
     cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
     frame_count++;
     queue_count++;
-    if (queue_count > 3)
+    if (queue_count > 2)
         queue_count = 1;
     return true;
 }
@@ -522,7 +522,6 @@ void HumanTracker::fillGroundTruthIMG(string filename)
     string cap = filename.substr(0, found) + "_gt/%03d.bmp";
     VideoCapture captureGT(cap);
     Mat gt;
-    vector<int> gtV;
 
 
     while (true) {
@@ -530,10 +529,12 @@ void HumanTracker::fillGroundTruthIMG(string filename)
         if (gt.empty())
             break;
         cvtColor(gt, gt, COLOR_BGR2GRAY);
+
 //        Mat gtGRID = gt.clone();
 //        add(gtGRID, gridMask, gtGRID);
 //        imshow("gtGRID", gtGRID);
-//        waitKey(0);
+
+        vector<int> gtV;
         gtV.resize(xPatchDim * yPatchDim);
         for (int j = 0; j < gt.rows; ++j)
             for (int i = 0; i < gt.cols; ++i)
@@ -542,6 +543,19 @@ void HumanTracker::fillGroundTruthIMG(string filename)
 
         for (int i = 0; i < gtV.size(); ++i)
             groundTruth.push_back(gtV[i]);
+
+//        Mat gtShow = Mat::zeros(gt.size(), gt.type());
+//        int patchWidth = gt.cols / xPatchDim;
+//        int patchHeight = gt.rows / yPatchDim;
+
+//        for (int j = 0; j < yPatchDim; ++j)
+//            for (int i = 0; i < xPatchDim; ++i) {
+//                rectangle(gtShow,
+//                          Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
+//                          Scalar(255 * gtV[j * xPatchDim + i]), -1);
+//            }
+//        imshow("gtShow", gtShow);
+//        waitKey(0);
     }
 }
 
@@ -714,6 +728,7 @@ void HumanTracker::updateHOT(int queue_index)
 
     uint32_t hstg = 0;
     double magnStep = magnMax / m;
+    double magnM = 0;
     for (int i = 0; i < p0.size(); ++i) {
         if (p0[i].path.size() < 2)
             return;
@@ -722,6 +737,10 @@ void HumanTracker::updateHOT(int queue_index)
         Point2f pt2 = p0[i].path[p0[i].path.size() - 1];
 
         double magn = norm(pt2 - pt1);
+        if (magn > magnM) {
+            magnM = magn;
+            cout << magnM << endl;
+        }
         int magnShift = m - 1;
         for (int i = 0; i < m; ++i)
             if (magn < (magnStep * (i + 1))) {
@@ -1012,7 +1031,7 @@ void Patch::updateComm()
     comm = 0;
     for (int j = 0; j < lbt.size(); ++j) {
         if (lbt[j] != 0) {
-            if (lbtLifeTime[j] > 5)
+            if (lbtLifeTime[j] > TL)
                 if (lbt[j] > 0)
                     lbt[j]--;
             comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
