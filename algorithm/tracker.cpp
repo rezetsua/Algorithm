@@ -198,16 +198,18 @@ void HumanTracker::filterAndDrawPoint()
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 30;
-    add(new_color_frame, patchCommMask, new_color_frame);
+    int pauseTime = stepByStep ? 0 : waitkeyPause;
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
     Mat grid = gridMask.clone();
     cvtColor(grid, grid, COLOR_GRAY2BGR);
     add(new_color_frame, grid, new_color_frame);
-    //imshow("info", info);
     imshow("flow", new_color_frame);
+    Mat analysis = new_color_frame.clone();
+    add(analysis, patchCommMask, analysis);
+    imshow("analysis", analysis);
+    //imshow("info", info);
     if (waitKey(pauseTime) == 27)
         return stepByStep;
     old_frame = new_frame.clone();
@@ -366,7 +368,7 @@ void HumanTracker::drawPointPath()
             // Draw
             for (int j = 1; j < p0[i].path.size(); j++)
                 line(lineMask, p0[i].path[j], p0[i].path[j - 1],
-                     Scalar(0, p0[i].averageVelocity * 40, 255 - p0[i].averageVelocity * 40), 2);
+                     Scalar(0, p0[i].averageVelocity * 255 / magnMax, 255 - p0[i].averageVelocity * 255 / magnMax), 2);
         }
     }
 }
@@ -1053,6 +1055,8 @@ double Patch::getIndexWeight(int j, int jmax)
 
     double dMmax = mjmax > magnMax / 2 ? mjmax : magnMax - mjmax;
     double dM = std::abs(mj - mjmax);
+//    double dMmax = magnMax - mjmax - magnMax / (2 * m);
+//    double dM = mj - mjmax;
     assert(dMmax >= dM);
 
     double dOmax = M_PI;
@@ -1065,6 +1069,17 @@ double Patch::getIndexWeight(int j, int jmax)
     double C = (pow(dM - dMmax, 2)) / (2 * pow(sigM, 2));
 
     double weight = A * exp(-1 * B - C);
+//    double weightO = A * exp(-1 * B);
+//    double weightM = A * exp(-1 * C);
+//    double oK = 1;
+//    double mK = 1;
+//    double weight = weightO / oK + weightM / mK;
+
+//    if (C < 2 || B < 2)
+//        cout << "gotcha" << endl;
+//    if (weight > 0.1)
+//        cout << "gotcha" << endl;
+
     return weight;
 }
 

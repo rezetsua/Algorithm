@@ -24,7 +24,7 @@ const int o = 8; // Orientation dimension
 const int m = 4; // Magnitude dimension
 const int TL = 5; // Tracklet length
 
-const int magnMax = 8; // Tracklet length
+const int magnMax = 4; // Tracklet length
 
 enum Detectors {
     GFTT_Detector = 0,
@@ -140,6 +140,7 @@ public:
     bool showMergePoint = false;
     bool trajectoryAnalys = false;
     bool predictPatchLBT = true;
+    int waitkeyPause = 30;
 
     vector<double> prob;
     vector<int> truth;
