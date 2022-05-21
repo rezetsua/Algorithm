@@ -42,6 +42,11 @@ enum Flow {
     RLOF
 };
 
+enum CaptureMode {
+    VIDEO_CAPTURE = 0,
+    IMAGE_CAPTURE
+};
+
 class FPoint
 {
 public:
@@ -86,7 +91,7 @@ public:
 class HumanTracker
 {
 public:
-    HumanTracker(const string& filename, int detector);
+    HumanTracker(const string& filename, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
 
 public:
     void startTracking();
@@ -111,7 +116,8 @@ private:
     void fillCoordinateToPatchID();
     void fillGridMask();
     void fillPatches();
-    void fillGroundTruth(string filename);
+    void fillGroundTruthTXT(string filename);
+    void fillGroundTruthIMG(string filename);
     Scalar cvtAngleToBGR(int angle);
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
@@ -133,6 +139,7 @@ public:
     bool showDirection = false;
     bool showMergePoint = false;
     bool trajectoryAnalys = false;
+    bool predictPatchLBT = true;
 
     vector<double> prob;
     vector<int> truth;
@@ -163,6 +170,7 @@ private:
     vector<Patch> patches;
     vector<int> groundTruth;
     unsigned int frame_count;
+    int captureMode;
     int queue_count;
     int deletedGoodPathAmount;
     int goodPathLifeTimeSum;

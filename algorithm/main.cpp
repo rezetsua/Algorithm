@@ -4,8 +4,9 @@
 int main()
 {
     // Tracking
-    string filename = "/home/urii/Документы/DataSet/scene3.avi";
-    HumanTracker tracker(filename, Detectors::GFTT_Detector);
+//    string filename = "/home/urii/Документы/DataSet/scene3.avi";
+    string filename = "/home/urii/Документы/DataSet/ped2/Test005/001.tif";
+    HumanTracker tracker(filename, Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
     tracker.startTracking();
 
     normalize(tracker.prob, tracker.prob, 1, 0, NORM_MINMAX);

@@ -1,12 +1,24 @@
 #include "tracker.h"
 
-HumanTracker::HumanTracker(const string& filename, int detector_enum)
+HumanTracker::HumanTracker(const string& filename, int detector, int captureMode)
 {
-    capture.open(filename);
+    this->captureMode = captureMode;
+
+    if (captureMode == VIDEO_CAPTURE)
+        capture.open(filename);
+    else if (captureMode == IMAGE_CAPTURE) {
+        size_t found = filename.find_last_of(".");
+        string format = filename.substr(found);
+        found = filename.find_last_of("/");
+        string cap = filename.substr(0, found) + "/%03d" + format;
+        capture.open(cap);
+    }
+
     if (!capture.isOpened())
         cerr << "Unable to open file!" << endl;
 
     capture >> old_frame_color;
+
     frame_count = 1;
     queue_count = 1;
     deletedGoodPathAmount = 0;
@@ -38,8 +50,14 @@ HumanTracker::HumanTracker(const string& filename, int detector_enum)
     fillCoordinateToPatchID();
     fillGridMask();
     fillPatches();
-    fillGroundTruth(filename);
-    setDetector(detector_enum);
+
+    if (captureMode == VIDEO_CAPTURE)
+        fillGroundTruthTXT(filename);
+    else if (captureMode == IMAGE_CAPTURE) {
+        fillGroundTruthIMG(filename);
+    }
+
+    setDetector(detector);
     detectNewPoint(old_frame, 1);
 }
 
@@ -180,7 +198,7 @@ void HumanTracker::filterAndDrawPoint()
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : 1;
+    int pauseTime = stepByStep ? 0 : 30;
     add(new_color_frame, patchCommMask, new_color_frame);
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
@@ -482,7 +500,7 @@ void HumanTracker::fillPatches()
     }
 }
 
-void HumanTracker::fillGroundTruth(string filename)
+void HumanTracker::fillGroundTruthTXT(string filename)
 {
     size_t found = filename.find_last_of(".");
     filename.erase(found + 1, filename.size());
@@ -496,6 +514,35 @@ void HumanTracker::fillGroundTruth(string filename)
     groundTruth.resize(str.size());
     for (int i = 0; i < str.size(); ++i)
         groundTruth[i] = static_cast<int>(str[i]) - 48;
+}
+
+void HumanTracker::fillGroundTruthIMG(string filename)
+{
+    size_t found = filename.find_last_of("/");
+    string cap = filename.substr(0, found) + "_gt/%03d.bmp";
+    VideoCapture captureGT(cap);
+    Mat gt;
+    vector<int> gtV;
+
+
+    while (true) {
+        captureGT >> gt;
+        if (gt.empty())
+            break;
+        cvtColor(gt, gt, COLOR_BGR2GRAY);
+//        Mat gtGRID = gt.clone();
+//        add(gtGRID, gridMask, gtGRID);
+//        imshow("gtGRID", gtGRID);
+//        waitKey(0);
+        gtV.resize(xPatchDim * yPatchDim);
+        for (int j = 0; j < gt.rows; ++j)
+            for (int i = 0; i < gt.cols; ++i)
+                if (gt.at<uchar>(j, i) > 200)
+                    gtV[coordinateToPatchID.at<uchar>(j, i)] = 1;
+
+        for (int i = 0; i < gtV.size(); ++i)
+            groundTruth.push_back(gtV[i]);
+    }
 }
 
 Scalar HumanTracker::cvtAngleToBGR(int angle)
@@ -735,18 +782,22 @@ void HumanTracker::calcPatchCommotion(int queue_index)
     cout << dataCollectionCount << "\t";
     cout << fixed;
     cout.precision(2);
-//    if (dataCollectionCount < 50)
-//        return;
-
 
     double commSum = 0;
     for (int i = 0; i < patches.size(); ++i) {
         patches[i].updateComm();
         commSum += patches[i].comm;
-        //cout << patches[i].comm << " ";
+
+        if (captureMode == IMAGE_CAPTURE) {
+            prob.push_back(patches[i].comm);
+            truth.push_back(groundTruth[frame_count * xPatchDim * yPatchDim + i]);
+        }
     }
-    prob.push_back(commSum);
-    truth.push_back(groundTruth[frame_count]);
+    if (captureMode == VIDEO_CAPTURE) {
+        prob.push_back(commSum);
+        truth.push_back(groundTruth[frame_count]);
+    }
+
     cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
     globalComm = commSum;
 }
@@ -834,6 +885,9 @@ void HumanTracker::showPatchComm(int queue_index)
 
 void HumanTracker::patchInit(int index)
 {
+    if (!predictPatchLBT)
+        return;
+
     vector<int> neighbors;
     if (index % xPatchDim != 0)
         neighbors.push_back(index - 1);
