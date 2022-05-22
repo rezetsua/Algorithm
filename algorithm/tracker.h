@@ -21,11 +21,10 @@ using namespace cv;
 using namespace std;
 
 const int o = 8; // Orientation dimension
-const int m = 4; // Magnitude dimension
+const int m = 6; // Magnitude dimension
 const int TL = 5; // Tracklet length
 
-const int magnMax = 4; // Tracklet length
-const bool magnMode = true;
+const int magnMax = 6; // Tracklet length
 
 const bool showPoint = false;
 const bool showPath = true;
@@ -34,7 +33,7 @@ const bool showDirection = false;
 const bool showMergePoint = false;
 const bool trajectoryAnalys = false;
 const bool predictPatchLBT = true;
-const int waitkeyPause = 1;
+const int waitkeyPause = 30;
 
 enum Detectors {
     GFTT_Detector = 0,
@@ -84,7 +83,7 @@ public:
 class Patch
 {
 public:
-    explicit Patch(Point2f pt);
+    explicit Patch(Point2f pt, bool mM);
     void updateComm();
     double getIndexWeight(int j, int jmax);
     std::pair<int, int> getLocalIndex(int i);
@@ -96,12 +95,13 @@ public:
     double comm; // Commutation
     vector<double> indexToAngle;
     vector<double> indexToMagnitude;
+    bool magnMode;
 };
 
 class HumanTracker
 {
 public:
-    HumanTracker(const string& filename, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
+    HumanTracker(const string& filename, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE, bool mM = false);
 
 public:
     void startTracking();
@@ -143,6 +143,7 @@ private:
 
 public:
     bool running;
+    bool magnMode;
 
     vector<double> prob;
     vector<int> truth;
