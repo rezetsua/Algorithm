@@ -66,9 +66,9 @@ void Measurement::exportToFile(vector<int> &input, string output)
     fout.close();
 }
 
-void Measurement::singleShot(const string &filename, int detector, int captureMode, bool mM)
+void Measurement::singleShot(const string &filename, int detector, int captureMode)
 {
-    HumanTracker tracker(filename, detector, captureMode, mM);
+    HumanTracker tracker(filename, detector, captureMode);
     tracker.startTracking();
     normalize(tracker.prob, tracker.prob, 1, 0, NORM_MINMAX);
     exportToFile(tracker.prob, "/home/urii/Документы/DataSet/proba.txt");

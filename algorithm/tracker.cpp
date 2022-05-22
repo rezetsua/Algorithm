@@ -1,6 +1,6 @@
 #include "tracker.h"
 
-HumanTracker::HumanTracker(const string& filename, int detector, int captureMode, bool mM)
+HumanTracker::HumanTracker(const string& filename, int detector, int captureMode)
 {
     this->captureMode = captureMode;
 
@@ -30,7 +30,6 @@ HumanTracker::HumanTracker(const string& filename, int detector, int captureMode
     globalComm = 0;
     xPatchDim = 6;
     yPatchDim = 4;
-    magnMode = mM;
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
@@ -498,7 +497,7 @@ void HumanTracker::fillPatches()
         int x = old_frame_color.cols / (2 * xPatchDim) + xIndex * old_frame_color.cols / xPatchDim;
         int y = old_frame_color.rows / (2 * yPatchDim) + yIndex * old_frame_color.rows / yPatchDim;
 
-        patches.push_back(Patch(Point2f(x, y), magnMode));
+        patches.push_back(Patch(Point2f(x, y)));
         circle(gridMask, patches[i].center, 2, Scalar(0, 255, 0), -1);
     }
 }
@@ -1001,9 +1000,8 @@ void FPoint::updateVelocity()
     averageVelocity /= averageVelocityCount;
 }
 
-Patch::Patch(Point2f pt, bool mM)
+Patch::Patch(Point2f pt)
 {
-    magnMode = mM;
     isEmpty = true;
     center = pt;
     comm = 0;

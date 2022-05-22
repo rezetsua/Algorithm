@@ -14,11 +14,11 @@ int main()
     clear_file2.close();
 
     m.singleShot("/home/urii/Загрузки/UCSD_Anomaly_Dataset.v1p2/UCSDped2/Test/Test002/001.tif",
-                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE, true);
+                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
     m.singleShot("/home/urii/Загрузки/UCSD_Anomaly_Dataset.v1p2/UCSDped2/Test/Test005/001.tif",
-                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE, false);
+                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
     m.singleShot("/home/urii/Загрузки/UCSD_Anomaly_Dataset.v1p2/UCSDped2/Test/Test008/001.tif",
-                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE, false);
+                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
 
     return 0;
 }
