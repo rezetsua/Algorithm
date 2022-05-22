@@ -1053,10 +1053,10 @@ double Patch::getIndexWeight(int j, int jmax)
     double mj = indexToMagnitude[getLocalIndex(j).first];
     double mjmax = indexToMagnitude[getLocalIndex(jmax).first];
 
-    double dMmax = mjmax > magnMax / 2 ? mjmax : magnMax - mjmax;
-    double dM = std::abs(mj - mjmax);
-//    double dMmax = magnMax - mjmax - magnMax / (2 * m);
-//    double dM = mj - mjmax;
+//    double dMmax = mjmax > magnMax / 2 ? mjmax : magnMax - mjmax;
+//    double dM = std::abs(mj - mjmax);
+    double dMmax = magnMax - mjmax - magnMax / (2.0 * m);
+    double dM = mj - mjmax;
     assert(dMmax >= dM);
 
     double dOmax = M_PI;
@@ -1068,17 +1068,7 @@ double Patch::getIndexWeight(int j, int jmax)
     double B = (pow(dO - dOmax, 2)) / (2 * pow(sigO, 2));
     double C = (pow(dM - dMmax, 2)) / (2 * pow(sigM, 2));
 
-    double weight = A * exp(-1 * B - C);
-//    double weightO = A * exp(-1 * B);
-//    double weightM = A * exp(-1 * C);
-//    double oK = 1;
-//    double mK = 1;
-//    double weight = weightO / oK + weightM / mK;
-
-//    if (C < 2 || B < 2)
-//        cout << "gotcha" << endl;
-//    if (weight > 0.1)
-//        cout << "gotcha" << endl;
+    double weight = magnMode ? A * exp(-1 * C) : A * exp(-1 * B - C);
 
     return weight;
 }

@@ -6,7 +6,7 @@ int main()
     // Tracking
 //    string filename = "/home/urii/Документы/DataSet/scene3.avi";
 //    HumanTracker tracker(filename, Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
-    string filename = "/home/urii/Загрузки/UCSD_Anomaly_Dataset.v1p2/UCSDped2/Test/Test005/001.tif";
+    string filename = "/home/urii/Загрузки/UCSD_Anomaly_Dataset.v1p2/UCSDped1/Test/Test022/001.tif";
     HumanTracker tracker(filename, Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
     tracker.startTracking();
 

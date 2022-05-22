@@ -25,6 +25,7 @@ const int m = 4; // Magnitude dimension
 const int TL = 5; // Tracklet length
 
 const int magnMax = 4; // Tracklet length
+const bool magnMode = false;
 
 enum Detectors {
     GFTT_Detector = 0,
