@@ -7,6 +7,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include <fstream>
+#include "tracker.h"
 
 using namespace cv;
 using namespace std;
@@ -21,6 +22,7 @@ public:
     void drawCurve(vector<Point2f> &roc, Mat &img, const Scalar &color);
     void exportToFile(vector<double> &input, string output);
     void exportToFile(vector<int> &input, string output);
+    void singleShot(const string& filename, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
 
 public:
     double EER;

@@ -25,7 +25,16 @@ const int m = 4; // Magnitude dimension
 const int TL = 5; // Tracklet length
 
 const int magnMax = 4; // Tracklet length
-const bool magnMode = false;
+const bool magnMode = true;
+
+const bool showPoint = false;
+const bool showPath = true;
+const bool showApproximatedPath = false;
+const bool showDirection = false;
+const bool showMergePoint = false;
+const bool trajectoryAnalys = false;
+const bool predictPatchLBT = true;
+const int waitkeyPause = 1;
 
 enum Detectors {
     GFTT_Detector = 0,
@@ -134,14 +143,6 @@ private:
 
 public:
     bool running;
-    bool showPoint = false;
-    bool showPath = true;
-    bool showApproximatedPath = false;
-    bool showDirection = false;
-    bool showMergePoint = false;
-    bool trajectoryAnalys = false;
-    bool predictPatchLBT = true;
-    int waitkeyPause = 30;
 
     vector<double> prob;
     vector<int> truth;

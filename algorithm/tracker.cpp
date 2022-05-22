@@ -108,7 +108,7 @@ void HumanTracker::startTracking()
         if (!showResult(false)) break;
     }
 
-    waitKey(0);
+    //waitKey(0);
 }
 
 
@@ -811,12 +811,12 @@ void HumanTracker::calcPatchCommotion(int queue_index)
 
         if (captureMode == IMAGE_CAPTURE) {
             prob.push_back(patches[i].comm);
-            truth.push_back(groundTruth[frame_count * xPatchDim * yPatchDim + i]);
+            truth.push_back(groundTruth[(frame_count - 1) * xPatchDim * yPatchDim + i]);
         }
     }
     if (captureMode == VIDEO_CAPTURE) {
         prob.push_back(commSum);
-        truth.push_back(groundTruth[frame_count]);
+        truth.push_back(groundTruth[frame_count - 1]);
     }
 
     cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
