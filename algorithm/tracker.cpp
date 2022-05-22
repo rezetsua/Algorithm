@@ -108,7 +108,7 @@ void HumanTracker::startTracking()
         if (!showResult(false)) break;
     }
 
-    //waitKey(0);
+    waitKey(0);
 }
 
 
@@ -730,7 +730,6 @@ void HumanTracker::updateHOT(int queue_index)
 
     uint32_t hstg = 0;
     double magnStep = magnMax / m;
-    double magnM = 0;
     for (int i = 0; i < p0.size(); ++i) {
         if (p0[i].path.size() < 2)
             return;
@@ -739,10 +738,6 @@ void HumanTracker::updateHOT(int queue_index)
         Point2f pt2 = p0[i].path[p0[i].path.size() - 1];
 
         double magn = norm(pt2 - pt1);
-        if (magn > magnM) {
-            magnM = magn;
-            cout << magnM << endl;
-        }
         int magnShift = m - 1;
         for (int i = 0; i < m; ++i)
             if (magn < (magnStep * (i + 1))) {
@@ -780,8 +775,10 @@ void HumanTracker::calcPatchHOT(int queue_index)
         if (p0[i].newHotCount != TL)
             continue;
 
-        int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x)/2;
-        int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y)/2;
+        int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x) / 2.0;
+        int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y) / 2.0;
+
+        assert((cX < old_frame.cols && cY < old_frame.rows && cX >= 0 && cY >= 0));
 
         int patchID = coordinateToPatchID.at<uchar>(cY, cX);
         if (patches.at(patchID).isEmpty)
@@ -800,9 +797,9 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         return;
 
     dataCollectionCount++;
-    cout << dataCollectionCount << "\t";
-    cout << fixed;
-    cout.precision(2);
+//    cout << dataCollectionCount << "\t";
+//    cout << fixed;
+//    cout.precision(2);
 
     double commSum = 0;
     for (int i = 0; i < patches.size(); ++i) {
@@ -819,8 +816,9 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         truth.push_back(groundTruth[frame_count - 1]);
     }
 
-    cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
+    //cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
     globalComm = commSum;
+    cout << endl;
 }
 
 void HumanTracker::showPatchGist(int queue_index)
@@ -893,6 +891,7 @@ void HumanTracker::showPatchComm(int queue_index)
         for (int i = 0; i < xPatchDim; ++i) {
             double maxComm = 0.25;
             double r = 255.0 * patches[j * xPatchDim + i].comm / maxComm;
+
             rectangle(patchCommMask,
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
                       Scalar(255 - r, 0, r), -1);
@@ -1031,22 +1030,27 @@ void Patch::updateComm()
     isEmpty = (L2 < 1);
 
     comm = 0;
+    double magnM = 0;//
+    double magnJmax = indexToMagnitude[getLocalIndex(jmax).first];
     for (int j = 0; j < lbt.size(); ++j) {
         if (lbt[j] != 0) {
             if (lbtLifeTime[j] > TL)
                 if (lbt[j] > 0)
-                    lbt[j]--;
+                    lbt[j] = 0; // !!!!!!!!!!!!!!!!!!!!!!!
             comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
             lbtLifeTime[j]++;
+            double mag = indexToMagnitude[getLocalIndex(j).first];//
+            if (mag > magnM)//
+                magnM = mag;//
         }
     }
+    cout << fixed;//
+    cout.precision(0);//
+    cout << magnJmax * 10 << "|" << magnM * 10 << " ";//
 }
 
 double Patch::getIndexWeight(int j, int jmax)
 {
-    double sigO = 2 * M_PI / 12.0; //1.0 / o;
-    double sigM = magnMax / 12.0; //1.0 / m;
-
     double oj = indexToAngle[getLocalIndex(j).second];
     double ojmax = indexToAngle[getLocalIndex(jmax).second];
 
@@ -1057,12 +1061,15 @@ double Patch::getIndexWeight(int j, int jmax)
 //    double dM = std::abs(mj - mjmax);
     double dMmax = magnMax - mjmax - magnMax / (2.0 * m);
     double dM = mj - mjmax;
-    assert(dMmax >= dM);
+    assert(dMmax > dM - 1e-2);
 
     double dOmax = M_PI;
     double dO = std::abs(oj - ojmax);
     dO = dO > M_PI ? 2 * M_PI - dO : dO;
     assert(dOmax >= dO);
+
+    double sigO = dOmax / 6.0; //1.0 / o;
+    double sigM = dMmax / 6.0; //1.0 / m;
 
     double A = 1; // 1 / (2 * M_PI * sigO * sigM);
     double B = (pow(dO - dOmax, 2)) / (2 * pow(sigO, 2));

@@ -21,11 +21,11 @@ using namespace cv;
 using namespace std;
 
 const int o = 8; // Orientation dimension
-const int m = 4; // Magnitude dimension
-const int TL = 5; // Tracklet length
+const int m = 10; // Magnitude dimension
+const int TL = 10; // Tracklet length
 
-const int magnMax = 4; // Tracklet length
-const bool magnMode = true;
+const double magnMax = 5; // Tracklet length
+const bool magnMode = false;
 
 const bool showPoint = false;
 const bool showPath = true;
@@ -34,7 +34,7 @@ const bool showDirection = false;
 const bool showMergePoint = false;
 const bool trajectoryAnalys = false;
 const bool predictPatchLBT = true;
-const int waitkeyPause = 1;
+const int waitkeyPause = 30;
 
 enum Detectors {
     GFTT_Detector = 0,
