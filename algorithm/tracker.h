@@ -22,11 +22,17 @@ using namespace std;
 
 const int o = 8; // Orientation dimension
 const int m = 10; // Magnitude dimension
-const int TL = 10; // Tracklet length
+const int TL = 5; // Tracklet length
 
-const double magnMax = 5; // Tracklet length
+const double magnMax = 7;
+const double commTreshToShow = 0.1;
+const double patchInitWeight = 1;
+const bool bigPatchInit = false;
+const int lbtLifeTimeDelta = 5;
+const bool lbtResetLifeTime = true;
 const bool magnMode = false;
 
+const int waitkeyPause = 30;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
@@ -34,7 +40,6 @@ const bool showDirection = false;
 const bool showMergePoint = false;
 const bool trajectoryAnalys = false;
 const bool predictPatchLBT = true;
-const int waitkeyPause = 30;
 
 enum Detectors {
     GFTT_Detector = 0,
@@ -140,6 +145,7 @@ private:
     void showPatchGist(int queue_index);
     void showPatchComm(int queue_index);
     void patchInit(int index);
+    void printInfo();
 
 public:
     bool running;
@@ -175,8 +181,6 @@ private:
     unsigned int frame_count;
     int captureMode;
     int queue_count;
-    int deletedGoodPathAmount;
-    int goodPathLifeTimeSum;
     int normalPointVelocityAmount;
     int abnormalPointVelocityAmount;
     double averageVelocityRatio;
@@ -186,6 +190,12 @@ private:
     int yPatchDim;
     int dataCollectionCount;
     double globalComm;
+
+    long long deletedGoodPathAmount = 0;
+    long long goodPathLifeTimeSum = 0;
+    double computingTimeCost = 0;
+    long long usfullPointAmount = 0;
+    long long usfullPointCount = 0;
 };
 
 #endif // HUMANTRACKER_H

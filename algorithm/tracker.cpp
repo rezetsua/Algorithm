@@ -102,12 +102,14 @@ void HumanTracker::startTracking()
         showPathInfo(2);
 
         t = ((double)getTickCount() - t)/getTickFrequency();
+        computingTimeCost += t;
         if (frame_count % 10 == 0)
             putInfo("FPS " + std::to_string((int)(1/t)), 5);
 
         if (!showResult(false)) break;
     }
 
+    printInfo();
     waitKey(0);
 }
 
@@ -209,7 +211,7 @@ bool HumanTracker::showResult(bool stepByStep)
     Mat analysis = new_color_frame.clone();
     add(analysis, patchCommMask, analysis);
     imshow("analysis", analysis);
-    //imshow("info", info);
+    imshow("info", info);
     if (waitKey(pauseTime) == 27)
         return stepByStep;
     old_frame = new_frame.clone();
@@ -408,6 +410,8 @@ void HumanTracker::approximatePath()
         }
     }
     putInfo("Deleted bad point " + std::to_string(count), 3);
+    usfullPointAmount += p0.size();
+    usfullPointCount++;
 }
 
 void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
@@ -633,8 +637,6 @@ void HumanTracker::showPathInfo(int queue_index)
         return;
     int averagePathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
     putInfo("Average path life time " + std::to_string(averagePathLifeTime), 4);
-    goodPathLifeTimeSum = 0;
-    deletedGoodPathAmount = 0;
 }
 
 void HumanTracker::updateMainStream(int queue_index)
@@ -889,8 +891,7 @@ void HumanTracker::showPatchComm(int queue_index)
     patchCommMask = Mat::zeros(patchCommMask.size(), patchCommMask.type());
     for (int j = 0; j < yPatchDim; ++j)
         for (int i = 0; i < xPatchDim; ++i) {
-            double maxComm = 0.25;
-            double r = 255.0 * patches[j * xPatchDim + i].comm / maxComm;
+            double r = 255.0 * patches[j * xPatchDim + i].comm / commTreshToShow;
 
             rectangle(patchCommMask,
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
@@ -909,14 +910,29 @@ void HumanTracker::patchInit(int index)
         return;
 
     vector<int> neighbors;
-    if (index % xPatchDim != 0)
+    bool left = index % xPatchDim != 0;
+    bool right = (index + 1) % xPatchDim != 0;
+    bool top = index - xPatchDim >= 0;
+    bool down = index + xPatchDim < xPatchDim * yPatchDim;
+    if (left)
         neighbors.push_back(index - 1);
-    if ((index + 1) % xPatchDim != 0)
+    if (right)
         neighbors.push_back(index + 1);
-    if (index - xPatchDim >= 0)
+    if (top)
         neighbors.push_back(index - xPatchDim);
-    if (index + xPatchDim < xPatchDim * yPatchDim)
+    if (down)
         neighbors.push_back(index + xPatchDim);
+
+    if (bigPatchInit) {
+        if (left && top)
+            neighbors.push_back(index - xPatchDim - 1);
+        if (right && top)
+            neighbors.push_back(index - xPatchDim + 1);
+        if (left && down)
+            neighbors.push_back(index + xPatchDim - 1);
+        if (right && down)
+            neighbors.push_back(index + xPatchDim + 1);
+    }
 
     for (int i = 0; i < neighbors.size(); i++) {
         if (patches.at(neighbors[i]).isEmpty)
@@ -927,10 +943,21 @@ void HumanTracker::patchInit(int index)
             if (patches.at(neighbors[i]).lbt[j] > patches.at(neighbors[i]).lbt[jmax])
                 jmax = j;
         }
-        patches.at(index).lbt[jmax] = patches.at(neighbors[i]).lbt[jmax];
+        patches.at(index).lbt[jmax] = patchInitWeight * patches.at(neighbors[i]).lbt[jmax];
         patches.at(index).lbtLifeTime[jmax] = 0;
     }
     patches.at(index).isEmpty = false;
+}
+
+void HumanTracker::printInfo()
+{
+    int avgPathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
+    int avgPointAmount = usfullPointAmount / usfullPointCount;
+    int avgFPS = frame_count / computingTimeCost;
+
+    cout << "Average usfull point amount = " << avgPointAmount << endl;
+    cout << "Average path life time = " << avgPathLifeTime << endl;
+    cout << "Average FPS = " << avgFPS << endl;
 }
 
 FPoint::FPoint()
@@ -1033,16 +1060,19 @@ void Patch::updateComm()
     double magnM = 0;//
     double magnJmax = indexToMagnitude[getLocalIndex(jmax).first];
     for (int j = 0; j < lbt.size(); ++j) {
-        if (lbt[j] != 0) {
-            if (lbtLifeTime[j] > TL)
-                if (lbt[j] > 0)
-                    lbt[j] = 0; // !!!!!!!!!!!!!!!!!!!!!!!
-            comm += getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
-            lbtLifeTime[j]++;
-            double mag = indexToMagnitude[getLocalIndex(j).first];//
-            if (mag > magnM)//
-                magnM = mag;//
-        }
+        if (lbt[j] == 0)
+            continue;
+        assert(lbt[j] > 0);
+        if (lbtLifeTime[j] > lbtLifeTimeDelta)
+            lbtResetLifeTime ? lbt[j] = 0 : lbt[j]--;
+        assert(L2 > 0);
+        double currComm = getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
+        assert(currComm >= 0 && currComm <= 1);
+        comm += currComm;
+        lbtLifeTime[j]++;
+        double mag = indexToMagnitude[getLocalIndex(j).first];//
+        if (mag > magnM)//
+            magnM = mag;//
     }
     cout << fixed;//
     cout.precision(0);//
@@ -1059,7 +1089,7 @@ double Patch::getIndexWeight(int j, int jmax)
 
 //    double dMmax = mjmax > magnMax / 2 ? mjmax : magnMax - mjmax;
 //    double dM = std::abs(mj - mjmax);
-    double dMmax = magnMax - mjmax - magnMax / (2.0 * m);
+    double dMmax = magnMax - mjmax;
     double dM = mj - mjmax;
     assert(dMmax > dM - 1e-2);
 
@@ -1070,6 +1100,7 @@ double Patch::getIndexWeight(int j, int jmax)
 
     double sigO = dOmax / 6.0; //1.0 / o;
     double sigM = dMmax / 6.0; //1.0 / m;
+    assert(sigM > 0 && sigO > 0);
 
     double A = 1; // 1 / (2 * M_PI * sigO * sigM);
     double B = (pow(dO - dOmax, 2)) / (2 * pow(sigO, 2));
