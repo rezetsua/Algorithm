@@ -28,8 +28,8 @@ HumanTracker::HumanTracker(const string& filename, int detector, int captureMode
     averageVelocityRatioCount = 0;
     dataCollectionCount = 0;
     globalComm = 0;
-    xPatchDim = 6;
-    yPatchDim = 4;
+    xPatchDim = 3;
+    yPatchDim = 2;
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
@@ -70,8 +70,9 @@ void HumanTracker::startTracking()
 {
     running = true;
 
+    double t;
     while(running){
-        double t = (double)getTickCount();
+        t = (double)getTickCount();
 
         if (!getNextFrame()) break;
 
@@ -101,16 +102,16 @@ void HumanTracker::startTracking()
 
         showPathInfo(2);
 
-        t = ((double)getTickCount() - t)/getTickFrequency();
-        computingTimeCost += t;
+        double dt = ((double)getTickCount() - t)/getTickFrequency();
+        computingTimeCost += dt;
         if (frame_count % 10 == 0)
-            putInfo("FPS " + std::to_string((int)(1/t)), 5);
+            putInfo("FPS " + std::to_string((int)(1/dt)), 5);
 
         if (!showResult(false)) break;
     }
 
     printInfo();
-    waitKey(0);
+    //waitKey(0);
 }
 
 
@@ -211,7 +212,7 @@ bool HumanTracker::showResult(bool stepByStep)
     Mat analysis = new_color_frame.clone();
     add(analysis, patchCommMask, analysis);
     imshow("analysis", analysis);
-    imshow("info", info);
+    //imshow("info", info);
     if (waitKey(pauseTime) == 27)
         return stepByStep;
     old_frame = new_frame.clone();
@@ -958,6 +959,27 @@ void HumanTracker::printInfo()
     cout << "Average usfull point amount = " << avgPointAmount << endl;
     cout << "Average path life time = " << avgPathLifeTime << endl;
     cout << "Average FPS = " << avgFPS << endl;
+}
+
+void HumanTracker::exportParametrs(double observed, string filename)
+{
+    if (!isExportResult)
+        return;
+
+    ofstream fout("/home/urii/Документы/DataSet/txt/filename.txt");
+    fout << filename << endl;
+    fout.close();
+
+    int avgPointAmount = usfullPointAmount / usfullPointCount;
+    int avgPathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
+    int avgFPS = frame_count / computingTimeCost;
+
+    fout.open(filename, std::ios::app);
+    fout << observed;
+    fout << "," << avgPointAmount;
+    fout << "," << avgPathLifeTime;
+    fout << "," << avgFPS;
+    fout.close();
 }
 
 FPoint::FPoint()

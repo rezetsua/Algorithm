@@ -21,18 +21,20 @@ using namespace cv;
 using namespace std;
 
 const int o = 8; // Orientation dimension
-const int m = 10; // Magnitude dimension
+const int m = 5; // Magnitude dimension
 const int TL = 5; // Tracklet length
 
-const double magnMax = 7;
-const double commTreshToShow = 0.1;
-const double patchInitWeight = 1;
+const double magnMax = 6;
+const double commTreshToShow = 0.09;
+const double patchInitWeight = 3.5;
 const bool bigPatchInit = false;
-const int lbtLifeTimeDelta = 5;
+const int lbtLifeTimeDelta = 15;
 const bool lbtResetLifeTime = true;
 const bool magnMode = false;
 
-const int waitkeyPause = 30;
+const bool isExportResult = true;
+
+const int waitkeyPause = 1;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
@@ -40,6 +42,7 @@ const bool showDirection = false;
 const bool showMergePoint = false;
 const bool trajectoryAnalys = false;
 const bool predictPatchLBT = true;
+
 
 enum Detectors {
     GFTT_Detector = 0,
@@ -111,6 +114,7 @@ public:
 public:
     void startTracking();
     void stopTracking();
+    void exportParametrs(double observed, string filename);
 
 private:
     bool getNextFrame();

@@ -70,7 +70,10 @@ void Measurement::singleShot(const string &filename, int detector, int captureMo
 {
     HumanTracker tracker(filename, detector, captureMode);
     tracker.startTracking();
+    string  expFileName = "/home/urii/Документы/DataSet/Experiments/ped2/";
+    expFileName += "5.m.TS23.TL5.txt";
+    tracker.exportParametrs(m, expFileName);
     normalize(tracker.prob, tracker.prob, 1, 0, NORM_MINMAX);
-    exportToFile(tracker.prob, "/home/urii/Документы/DataSet/proba.txt");
-    exportToFile(tracker.truth, "/home/urii/Документы/DataSet/truth.txt");
+    exportToFile(tracker.prob, "/home/urii/Документы/DataSet/txt/proba.txt");
+    exportToFile(tracker.truth, "/home/urii/Документы/DataSet/txt/truth.txt");
 }
