@@ -21,7 +21,7 @@ using namespace cv;
 using namespace std;
 
 const int o = 8; // Orientation dimension
-const int m = 5; // Magnitude dimension
+const int m = 10; // Magnitude dimension
 const int TL = 5; // Tracklet length
 
 const double magnMax = 6;
@@ -32,9 +32,9 @@ const int lbtLifeTimeDelta = 15;
 const bool lbtResetLifeTime = true;
 const bool magnMode = false;
 
-const bool isExportResult = true;
+const bool isExportResult = false;
 
-const int waitkeyPause = 1;
+const int waitkeyPause = 30;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
@@ -174,6 +174,7 @@ private:
     Mat patchCommMask;
     vector<int> angleToShift;
     VideoCapture capture;
+    VideoWriter video;
     vector<uchar> status;
     Ptr<cv::Feature2D> detector;
     vector<FPoint> p0;

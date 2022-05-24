@@ -28,8 +28,8 @@ HumanTracker::HumanTracker(const string& filename, int detector, int captureMode
     averageVelocityRatioCount = 0;
     dataCollectionCount = 0;
     globalComm = 0;
-    xPatchDim = 3;
-    yPatchDim = 2;
+    xPatchDim = 6;
+    yPatchDim = 4;
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
@@ -59,6 +59,8 @@ HumanTracker::HumanTracker(const string& filename, int detector, int captureMode
 
     setDetector(detector);
     detectNewPoint(old_frame, 1);
+
+    video.open("/home/urii/Документы/DataSet/out.avi", cv::VideoWriter::fourcc('M','J','P','G'), 30, old_frame.size());
 }
 
 void HumanTracker::stopTracking()
@@ -111,7 +113,7 @@ void HumanTracker::startTracking()
     }
 
     printInfo();
-    //waitKey(0);
+    waitKey(0);
 }
 
 
@@ -212,6 +214,7 @@ bool HumanTracker::showResult(bool stepByStep)
     Mat analysis = new_color_frame.clone();
     add(analysis, patchCommMask, analysis);
     imshow("analysis", analysis);
+    //video.write(analysis);
     //imshow("info", info);
     if (waitKey(pauseTime) == 27)
         return stepByStep;
