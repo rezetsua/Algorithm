@@ -28,8 +28,6 @@ HumanTracker::HumanTracker(const string& filename, int detector, int captureMode
     averageVelocityRatioCount = 0;
     dataCollectionCount = 0;
     globalComm = 0;
-    xPatchDim = 6;
-    yPatchDim = 4;
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
@@ -113,7 +111,7 @@ void HumanTracker::startTracking()
     }
 
     printInfo();
-    waitKey(0);
+    //waitKey(0);
 }
 
 
@@ -140,7 +138,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
 
-        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(15,15), 2, criteria, 0, 1e-4 );
+        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(27,27), 2, criteria, 0, 1e-2);
         int statusCount = 0;
         for (int i = 0; i < status.size(); ++i)
             if (status[i] == 0)
@@ -153,19 +151,19 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         vector<Point2f> point0;
         optflow::RLOFOpticalFlowParameter *rlofParam = new optflow::RLOFOpticalFlowParameter();
         rlofParam->solverType = optflow::ST_BILINEAR;
-        rlofParam->supportRegionType = optflow::SR_CROSS; //SR_FIXED
+        rlofParam->supportRegionType = optflow::SR_FIXED;
         rlofParam->normSigma0 = std::numeric_limits<float>::max();
         rlofParam->normSigma1 = std::numeric_limits<float>::max();
         rlofParam->smallWinSize = 9;
         rlofParam->largeWinSize = 21;
-        rlofParam->crossSegmentationThreshold = 25;
-        rlofParam->maxLevel = 4;
+        rlofParam->crossSegmentationThreshold = 30; // Important if supportRegionType = SR_CROSS
+        rlofParam->maxLevel = 3;
         rlofParam->useInitialFlow = false;
-        rlofParam->useIlluminationModel = true;
-        rlofParam->useGlobalMotionPrior = true;
-        rlofParam->maxIteration = 30;
-        rlofParam->minEigenValue = 0.0001f;
-        rlofParam->globalMotionRansacThreshold = 10;
+        rlofParam->useIlluminationModel = false;
+        rlofParam->useGlobalMotionPrior = false;
+        rlofParam->maxIteration = 20;
+        rlofParam->minEigenValue = 1e-3;
+        rlofParam->globalMotionRansacThreshold = 20;
         Ptr<optflow::RLOFOpticalFlowParameter> rlofParamPtr(rlofParam);
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
@@ -227,17 +225,17 @@ void HumanTracker::setDetector(int detector_enum)
     switch (detector_enum) {
     case GFTT_Detector: {
         // Увеличить количество точек: maxCorners+
-        detector = GFTTDetector::create(1400, 0.03, 3, 3, false, 0.04);
+        detector = GFTTDetector::create(500, 0.03, 3, 3, false, 0.03);
         break;
     }
     case FAST_Detector: {
         // Увеличить количество точек: threshold-, type = TYPE_9_16
-        detector = FastFeatureDetector::create(20, true, FastFeatureDetector::TYPE_9_16);
+        detector = FastFeatureDetector::create(80, true, FastFeatureDetector::TYPE_9_16);
         break;
     }
     case AGAST_Detector: {
         // Увеличить количество точек: threshold-, type = OAST_9_16
-        detector = AgastFeatureDetector::create(14, true, AgastFeatureDetector::AGAST_5_8);
+        detector = AgastFeatureDetector::create(40, false, AgastFeatureDetector::AGAST_7_12s);
         break;
     }
     case SimpleBlob_Detector: {
@@ -245,8 +243,8 @@ void HumanTracker::setDetector(int detector_enum)
         // Setup SimpleBlobDetector parameters.
         SimpleBlobDetector::Params params;
         // Change thresholds
-        params.minThreshold = 10;
-        params.maxThreshold = 200;
+        params.minThreshold = 20;
+        params.maxThreshold = 100;
         // Filter by Area.
         params.filterByArea = true;
         params.minArea = 5;
@@ -262,27 +260,27 @@ void HumanTracker::setDetector(int detector_enum)
         detector = SimpleBlobDetector::create(params);
         break;
     }
-//    case SIFT_Detector: {
-//        detector = SIFT::create(0, 3, 0.04, 10, 1.6);
-//        break;
-//    }
+    case SIFT_Detector: {
+        detector = SIFT::create(0, 5, 0.08, 30, 1.0);
+        break;
+    }
     case MSER_Detector: {
         /*@param _delta it compares \f$(size_{i}-size_{i-delta})/size_{i-delta}\f$
           @param _min_area prune the area which smaller than minArea
           @param _max_area prune the area which bigger than maxArea
           @param _max_variation prune the area have similar size to its children
           Увеличить количество точек: delta-, max_variation+ */
-        detector = MSER::create(20, 80, 200, 0.5);;
+        detector = MSER::create(1, 10, 60, 0.5);
         break;
     }
     case KAZE_Detector: {
         // Увеличить количество точек: threshold-, diffusivity = DIFF_CHARBONNIER
-        detector = KAZE::create(false, false, 0.0005f, 4, 4, KAZE::DIFF_PM_G2);
+        detector = KAZE::create(false, false, 0.001f, 4, 5, KAZE::DIFF_CHARBONNIER);
         break;
     }
     case AKAZE_Detector: {
         // Увеличить количество точек: threshold-, diffusivity = DIFF_CHARBONNIER
-        detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.0005f, 4, 4, KAZE::DIFF_PM_G2);
+        detector = AKAZE::create(AKAZE::DESCRIPTOR_KAZE, 0, 1, 0.0005f, 4, 2, KAZE::DIFF_CHARBONNIER);
         break;
     }
     }

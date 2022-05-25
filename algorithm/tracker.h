@@ -13,7 +13,7 @@
 
 #include <cmath>
 #include <random>
-#include <ctime>
+#include <chrono>
 #include <stdint.h>
 #include <fstream>
 
@@ -23,18 +23,20 @@ using namespace std;
 const int o = 8; // Orientation dimension
 const int m = 10; // Magnitude dimension
 const int TL = 5; // Tracklet length
+const int xPatchDim = 6;
+const int yPatchDim = 4;
 
 const double magnMax = 6;
-const double commTreshToShow = 0.09;
+const double commTreshToShow = 0.0006;
 const double patchInitWeight = 3.5;
 const bool bigPatchInit = false;
 const int lbtLifeTimeDelta = 15;
 const bool lbtResetLifeTime = true;
 const bool magnMode = false;
 
-const bool isExportResult = false;
+const bool isExportResult = true;
 
-const int waitkeyPause = 30;
+const int waitkeyPause = 1;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
@@ -153,6 +155,7 @@ private:
 
 public:
     bool running;
+    double obsParam = 0;
 
     vector<double> prob;
     vector<int> truth;
@@ -191,8 +194,6 @@ private:
     double averageVelocityRatio;
     int averageVelocityRatioCount;
     int abnormalOutliersFlag;
-    int xPatchDim;
-    int yPatchDim;
     int dataCollectionCount;
     double globalComm;
 

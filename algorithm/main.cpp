@@ -14,7 +14,7 @@ int main()
     clear_file2.close();
 
     m.singleShot("/home/urii/Документы/DataSet/ped2/Test005/001.tif",
-                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
+                 Detectors::AKAZE_Detector, CaptureMode::IMAGE_CAPTURE);
 
     return 0;
 }
