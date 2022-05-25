@@ -70,8 +70,8 @@ void Measurement::singleShot(const string &filename, int detector, int captureMo
 {
     HumanTracker tracker(filename, detector, captureMode);
     tracker.startTracking();
-    string  expFileName = "/home/urii/Документы/DataSet/Experiments/ped2/";
-    expFileName += "5.octL.AKAZE.PP.txt";
+    string  expFileName = "/home/urii/Документы/DataSet/Experiments/ped1/";
+    expFileName += "19.Avangers.RLOF.txt";
     tracker.exportParametrs(tracker.obsParam, expFileName);
     normalize(tracker.prob, tracker.prob, 1, 0, NORM_MINMAX);
     exportToFile(tracker.prob, "/home/urii/Документы/DataSet/txt/proba.txt");

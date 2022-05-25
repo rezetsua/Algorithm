@@ -76,7 +76,7 @@ void HumanTracker::startTracking()
 
         if (!getNextFrame()) break;
 
-        calculateOpticalFlow(LUCAS_KANADA);
+        calculateOpticalFlow(RLOF);
 
         detectNewPoint(new_frame, 1);
 
@@ -137,8 +137,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         vector<Point2f> point0;
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
-
-        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(27,27), 2, criteria, 0, 1e-2);
+        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(18,18), 2, criteria, 0, 0.1);
         int statusCount = 0;
         for (int i = 0; i < status.size(); ++i)
             if (status[i] == 0)

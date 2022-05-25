@@ -13,8 +13,8 @@ int main()
     fstream clear_file2("/home/urii/Документы/DataSet/txt/truth.txt", ios::out);
     clear_file2.close();
 
-    m.singleShot("/home/urii/Документы/DataSet/ped2/Test005/001.tif",
-                 Detectors::AKAZE_Detector, CaptureMode::IMAGE_CAPTURE);
+    m.singleShot("/home/urii/Документы/DataSet/ped1/Test019/001.tif",
+                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
 
     return 0;
 }

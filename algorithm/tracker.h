@@ -21,22 +21,22 @@ using namespace cv;
 using namespace std;
 
 const int o = 8; // Orientation dimension
-const int m = 10; // Magnitude dimension
+const int m = 8; // Magnitude dimension
 const int TL = 5; // Tracklet length
 const int xPatchDim = 6;
 const int yPatchDim = 4;
 
 const double magnMax = 6;
-const double commTreshToShow = 0.0006;
-const double patchInitWeight = 3.5;
-const bool bigPatchInit = false;
-const int lbtLifeTimeDelta = 15;
+const double commTreshToShow = 0.0003;
+const double patchInitWeight = 1;
+const bool bigPatchInit = true;
+const int lbtLifeTimeDelta = 10;
 const bool lbtResetLifeTime = true;
 const bool magnMode = false;
 
-const bool isExportResult = true;
+const bool isExportResult = false;
 
-const int waitkeyPause = 1;
+const int waitkeyPause = 30;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
