@@ -1,8 +1,9 @@
 #include "tracker.h"
 
-HumanTracker::HumanTracker(const string& filename, int detector, int captureMode)
+HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int captureMode)
 {
     this->captureMode = captureMode;
+    flowType = flow;
 
     if (captureMode == VIDEO_CAPTURE)
         capture.open(filename);
@@ -76,7 +77,7 @@ void HumanTracker::startTracking()
 
         if (!getNextFrame()) break;
 
-        calculateOpticalFlow(RLOF);
+        calculateOpticalFlow(flowType);
 
         detectNewPoint(new_frame, 1);
 
@@ -137,7 +138,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         vector<Point2f> point0;
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
-        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(18,18), 2, criteria, 0, 0.1);
+        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(21,21), 2, criteria, 0, 0.1);
         int statusCount = 0;
         for (int i = 0; i < status.size(); ++i)
             if (status[i] == 0)
@@ -149,7 +150,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         vector<float> err;
         vector<Point2f> point0;
         optflow::RLOFOpticalFlowParameter *rlofParam = new optflow::RLOFOpticalFlowParameter();
-        rlofParam->solverType = optflow::ST_BILINEAR;
+        rlofParam->solverType = optflow::ST_STANDART;
         rlofParam->supportRegionType = optflow::SR_FIXED;
         rlofParam->normSigma0 = std::numeric_limits<float>::max();
         rlofParam->normSigma1 = std::numeric_limits<float>::max();
@@ -279,7 +280,7 @@ void HumanTracker::setDetector(int detector_enum)
     }
     case AKAZE_Detector: {
         // Увеличить количество точек: threshold-, diffusivity = DIFF_CHARBONNIER
-        detector = AKAZE::create(AKAZE::DESCRIPTOR_KAZE, 0, 1, 0.0005f, 4, 2, KAZE::DIFF_CHARBONNIER);
+        detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 100, 3, 0.0005f, 4, 2, KAZE::DIFF_CHARBONNIER);
         break;
     }
     }

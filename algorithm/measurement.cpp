@@ -66,12 +66,12 @@ void Measurement::exportToFile(vector<int> &input, string output)
     fout.close();
 }
 
-void Measurement::singleShot(const string &filename, int detector, int captureMode)
+void Measurement::singleShot(const string &filename, int flow, int detector, int captureMode)
 {
-    HumanTracker tracker(filename, detector, captureMode);
+    HumanTracker tracker(filename, flow, detector, captureMode);
     tracker.startTracking();
-    string  expFileName = "/home/urii/Документы/DataSet/Experiments/ped1/";
-    expFileName += "19.Avangers.RLOF.txt";
+    string  expFileName = "/home/urii/Документы/DataSet/Experiments/UMN/";
+    expFileName += "123.Avangers2.RLOF.txt";
     tracker.exportParametrs(tracker.obsParam, expFileName);
     normalize(tracker.prob, tracker.prob, 1, 0, NORM_MINMAX);
     exportToFile(tracker.prob, "/home/urii/Документы/DataSet/txt/proba.txt");

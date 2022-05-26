@@ -21,22 +21,22 @@ using namespace cv;
 using namespace std;
 
 const int o = 8; // Orientation dimension
-const int m = 8; // Magnitude dimension
+const int m = 16; // Magnitude dimension
 const int TL = 5; // Tracklet length
 const int xPatchDim = 6;
 const int yPatchDim = 4;
 
-const double magnMax = 6;
+const double magnMax = 4;
 const double commTreshToShow = 0.0003;
-const double patchInitWeight = 1;
-const bool bigPatchInit = true;
-const int lbtLifeTimeDelta = 10;
-const bool lbtResetLifeTime = true;
+const double patchInitWeight = 2;
+const bool bigPatchInit = false;
+const int lbtLifeTimeDelta = 20;
+const bool lbtResetLifeTime = false;
 const bool magnMode = false;
 
-const bool isExportResult = false;
+const bool isExportResult = true;
 
-const int waitkeyPause = 30;
+const int waitkeyPause = 1;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
@@ -111,7 +111,7 @@ public:
 class HumanTracker
 {
 public:
-    HumanTracker(const string& filename, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
+    HumanTracker(const string& filename, int flow = LUCAS_KANADA, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
 
 public:
     void startTracking();
@@ -195,6 +195,7 @@ private:
     int averageVelocityRatioCount;
     int abnormalOutliersFlag;
     int dataCollectionCount;
+    int flowType;
     double globalComm;
 
     long long deletedGoodPathAmount = 0;
