@@ -27,14 +27,14 @@ const int xPatchDim = 6;
 const int yPatchDim = 4;
 
 const double magnMax = 4;
-const double commTreshToShow = 0.0003;
+const double commTreshToShow = 6.0;
 const double patchInitWeight = 2;
 const bool bigPatchInit = false;
 const int lbtLifeTimeDelta = 20;
 const bool lbtResetLifeTime = false;
 const bool magnMode = false;
 
-const bool isExportResult = true;
+const bool isExportResult = false;
 
 const int waitkeyPause = 1;
 const bool showPoint = false;
@@ -152,6 +152,7 @@ private:
     void showPatchComm(int queue_index);
     void patchInit(int index);
     void printInfo();
+    void addAnomalyTitle(Mat &img);
 
 public:
     bool running;
@@ -197,6 +198,7 @@ private:
     int dataCollectionCount;
     int flowType;
     double globalComm;
+    bool anomaly = false;
 
     long long deletedGoodPathAmount = 0;
     long long goodPathLifeTimeSum = 0;

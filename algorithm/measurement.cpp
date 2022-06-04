@@ -73,6 +73,11 @@ void Measurement::singleShot(const string &filename, int flow, int detector, int
     string  expFileName = "/home/urii/Документы/DataSet/Experiments/UMN/";
     expFileName += "123.Avangers2.RLOF.txt";
     tracker.exportParametrs(tracker.obsParam, expFileName);
+    double maxValue = 0;
+    for (int i = 0; i < tracker.prob.size(); ++i)
+        if (tracker.prob[i] > maxValue)
+            maxValue = tracker.prob[i];
+    cout <<  "Probs max value: " << maxValue << endl;
     normalize(tracker.prob, tracker.prob, 1, 0, NORM_MINMAX);
     exportToFile(tracker.prob, "/home/urii/Документы/DataSet/txt/proba.txt");
     exportToFile(tracker.truth, "/home/urii/Документы/DataSet/txt/truth.txt");

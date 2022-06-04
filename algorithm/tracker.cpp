@@ -211,8 +211,9 @@ bool HumanTracker::showResult(bool stepByStep)
     imshow("flow", new_color_frame);
     Mat analysis = new_color_frame.clone();
     add(analysis, patchCommMask, analysis);
+    addAnomalyTitle(analysis);
     imshow("analysis", analysis);
-    //video.write(analysis);
+    video.write(analysis);
     //imshow("info", info);
     if (waitKey(pauseTime) == 27)
         return stepByStep;
@@ -820,9 +821,13 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         truth.push_back(groundTruth[frame_count - 1]);
     }
 
+    if (commSum > 8.2)
+        anomaly = true;
+    else
+        anomaly = false;
     //cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
     globalComm = commSum;
-    cout << endl;
+    cout << commSum << endl;
 }
 
 void HumanTracker::showPatchGist(int queue_index)
@@ -960,6 +965,15 @@ void HumanTracker::printInfo()
     cout << "Average usfull point amount = " << avgPointAmount << endl;
     cout << "Average path life time = " << avgPathLifeTime << endl;
     cout << "Average FPS = " << avgFPS << endl;
+}
+
+void HumanTracker::addAnomalyTitle(Mat &img)
+{
+    Rect rect(10, 10, 180, 30);
+    Scalar color = anomaly ? Scalar(0, 0, 255) : Scalar(0, 255, 0);
+    string text = anomaly ? "Abnormal behavior" : "Normal behavior";
+    rectangle(img, rect, color, -1);
+    cv::putText(img, text, cv::Point(30, 30), cv::FONT_HERSHEY_DUPLEX, 0.5, Scalar(0), 2);
 }
 
 void HumanTracker::exportParametrs(double observed, string filename)

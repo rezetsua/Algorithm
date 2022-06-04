@@ -12,7 +12,7 @@ int main()
     clear_file2.close();
 
     m.singleShot("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::RLOF,
-                 Detectors::AKAZE_Detector, CaptureMode::VIDEO_CAPTURE);
+                 Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
 
 //    m.singleShot("/home/urii/Документы/DataSet/ped1/Test019/001.tif",
 //                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
