@@ -3,19 +3,23 @@
 
 int main()
 {
-    Measurement m;
-    // Tracking
+    HumanTracker tracker("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::LUCAS_KANADA,
+                         Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
+    tracker.startTracking();
 
-    fstream clear_file1("/home/urii/Документы/DataSet/txt/proba.txt", ios::out);
-    clear_file1.close();
-    fstream clear_file2("/home/urii/Документы/DataSet/txt/truth.txt", ios::out);
-    clear_file2.close();
+//    Measurement m;
+//    // Tracking
 
-    m.singleShot("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::RLOF,
-                 Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
+//    fstream clear_file1("/home/urii/Документы/DataSet/txt/proba.txt", ios::out);
+//    clear_file1.close();
+//    fstream clear_file2("/home/urii/Документы/DataSet/txt/truth.txt", ios::out);
+//    clear_file2.close();
 
-//    m.singleShot("/home/urii/Документы/DataSet/ped1/Test019/001.tif",
-//                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
+//    m.singleShot("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::LUCAS_KANADA,
+//                 Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
+
+////    m.singleShot("/home/urii/Документы/DataSet/ped1/Test019/001.tif",
+////                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
 
     return 0;
 }

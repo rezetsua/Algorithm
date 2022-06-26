@@ -20,32 +20,6 @@
 using namespace cv;
 using namespace std;
 
-const int o = 8; // Orientation dimension
-const int m = 16; // Magnitude dimension
-const int TL = 5; // Tracklet length
-const int xPatchDim = 6;
-const int yPatchDim = 4;
-
-const double magnMax = 4;
-const double commTreshToShow = 6.0;
-const double patchInitWeight = 2;
-const bool bigPatchInit = false;
-const int lbtLifeTimeDelta = 20;
-const bool lbtResetLifeTime = false;
-const bool magnMode = false;
-
-const bool isExportResult = false;
-
-const int waitkeyPause = 30;
-const bool showPoint = false;
-const bool showPath = true;
-const bool showApproximatedPath = false;
-const bool showDirection = false;
-const bool showMergePoint = false;
-const bool trajectoryAnalys = false;
-const bool predictPatchLBT = true;
-
-
 enum Detectors {
     GFTT_Detector = 0,
     FAST_Detector,
@@ -66,6 +40,43 @@ enum CaptureMode {
     VIDEO_CAPTURE = 0,
     IMAGE_CAPTURE
 };
+
+enum AnomalyType {
+    DETECTION = 0, // Binary answer to the question: Is there an anomaly behavior in the frame?
+    LOCALIZATION // Visual answer to the question: Where is the anomaly in the frame?
+};
+
+enum AnomalyCalcMode {
+    MAGNITUDE = 0,
+    DIRECTION,
+    BOTH
+};
+
+const int o = 8; // Orientation dimension
+const int m = 16; // Magnitude dimension
+const int TL = 5; // Tracklet length
+const int xPatchDim = 6;
+const int yPatchDim = 4;
+
+const double magnMax = 4;
+const double commTreshToShow = 6.0;
+const double patchInitWeight = 2;
+const bool bigPatchInit = false;
+const int lbtLifeTimeDelta = 20;
+const bool lbtResetLifeTime = false;
+
+const int queueIteration = 2;
+const int anomalyType = AnomalyType::DETECTION;
+const int anomalyCalcMode = AnomalyCalcMode::BOTH;
+
+const int waitkeyPause = 30;
+const bool showPoint = false;
+const bool showPath = true;
+const bool showApproximatedPath = false;
+const bool showDirection = false;
+const bool showMergePoint = false;
+const bool trajectoryAnalys = false;
+const bool predictPatchLBT = true;
 
 class FPoint
 {
@@ -116,7 +127,6 @@ public:
 public:
     void startTracking();
     void stopTracking();
-    void exportParametrs(double observed, string filename);
 
 private:
     bool getNextFrame();
@@ -125,14 +135,14 @@ private:
     bool showResult(bool stepByStep);
     void setDetector(int detector_enum);
     void detectNewPoint(Mat &frame, int queue_index);
-    void fillPointMat(int blockSize);
+    void fillPointMat(int blockSize); // Marks the areas of the found points
     void deleteStaticPoint(int queue_index);
     void putInfo(string text, int textY);
     void addPointToPath(int queue_index);
     void drawPointPath();
     void approximatePath();
     void drawDirection(vector<Point2f> &apx, int index);
-    void fillHSV2BGR();
+    void fillHSV2BGR(); // Creates an array to convert the angle of the vector to BGR color according to the HSV model
     void fillAngleToShift();
     void fillCoordinateToPatchID();
     void fillGridMask();
@@ -143,7 +153,6 @@ private:
     void mergePointToObject(int queue_index, int chanels);
     void collectPathInfo(int index);
     void showPathInfo(int queue_index);
-    void updateMainStream(int queue_index);
     void trajectoryAnalysis(int queue_index);
     void updateHOT(int queue_index);
     void calcPatchHOT(int queue_index);
@@ -156,8 +165,6 @@ private:
 
 public:
     bool running;
-    double obsParam = 0;
-
     vector<double> prob;
     vector<int> truth;
 
@@ -172,13 +179,10 @@ private:
     Mat mergeMask;
     Mat gridMask;
     Mat info;
-    Mat mainStream;
-    Mat mainStreamCount;
     Mat coordinateToPatchID;
     Mat patchCommMask;
     vector<int> angleToShift;
     VideoCapture capture;
-    VideoWriter video;
     vector<uchar> status;
     Ptr<cv::Feature2D> detector;
     vector<FPoint> p0;
@@ -190,14 +194,7 @@ private:
     unsigned int frame_count;
     int captureMode;
     int queue_count;
-    int normalPointVelocityAmount;
-    int abnormalPointVelocityAmount;
-    double averageVelocityRatio;
-    int averageVelocityRatioCount;
-    int abnormalOutliersFlag;
-    int dataCollectionCount;
     int flowType;
-    double globalComm;
     bool anomaly = false;
 
     long long deletedGoodPathAmount = 0;

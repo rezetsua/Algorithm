@@ -4,45 +4,37 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
 {
     this->captureMode = captureMode;
     flowType = flow;
+    setDetector(detector);
+    frame_count = 1;
+    queue_count = 1;
+    deletedGoodPathAmount = 0;
+    goodPathLifeTimeSum = 0;
 
-    if (captureMode == VIDEO_CAPTURE)
+    if (captureMode == VIDEO_CAPTURE) {
         capture.open(filename);
+        fillGroundTruthTXT(filename);
+    }
     else if (captureMode == IMAGE_CAPTURE) {
         size_t found = filename.find_last_of(".");
         string format = filename.substr(found);
         found = filename.find_last_of("/");
         string cap = filename.substr(0, found) + "/%03d" + format;
         capture.open(cap);
+        fillGroundTruthIMG(filename);
     }
-
     if (!capture.isOpened())
         cerr << "Unable to open file!" << endl;
-
     capture >> old_frame_color;
-
-    frame_count = 1;
-    queue_count = 1;
-    deletedGoodPathAmount = 0;
-    goodPathLifeTimeSum = 0;
-    averageVelocityRatio = 0;
-    abnormalOutliersFlag = 0;
-    averageVelocityRatioCount = 0;
-    dataCollectionCount = 0;
-    globalComm = 0;
 
     lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     mergeMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
-    mainStream = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     patchCommMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     gridMask = Mat::zeros(old_frame_color.size(), CV_8UC1);
-
     cvtColor(old_frame_color, old_frame, COLOR_BGR2GRAY);
-
     info = Mat::zeros(480, 480, old_frame.type());
     point_mat = Mat::zeros(old_frame.size(), old_frame.type());
     coordinateToPatchID = Mat::zeros(old_frame.size(), old_frame.type());
-    mainStreamCount = Mat::zeros(old_frame.size(), CV_32S);
 
     fillHSV2BGR();
     fillAngleToShift();
@@ -50,16 +42,8 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
     fillGridMask();
     fillPatches();
 
-    if (captureMode == VIDEO_CAPTURE)
-        fillGroundTruthTXT(filename);
-    else if (captureMode == IMAGE_CAPTURE) {
-        fillGroundTruthIMG(filename);
-    }
-
-    setDetector(detector);
+    // Makes first detection for flow algorithm
     detectNewPoint(old_frame, 1);
-
-    video.open("/home/urii/Документы/DataSet/out.avi", cv::VideoWriter::fourcc('M','J','P','G'), 30, old_frame.size());
 }
 
 void HumanTracker::stopTracking()
@@ -89,19 +73,7 @@ void HumanTracker::startTracking()
 
         trajectoryAnalysis(2);
 
-        updateHOT(2);
-
-        calcPatchHOT(2);
-
-        calcPatchCommotion(2);
-
-        showPatchGist(2);
-
-        showPatchComm(2);
-
         //mergePointToObject(3, 12);
-
-        showPathInfo(2);
 
         double dt = ((double)getTickCount() - t)/getTickFrequency();
         computingTimeCost += dt;
@@ -115,40 +87,38 @@ void HumanTracker::startTracking()
     waitKey(0);
 }
 
-
 bool HumanTracker::getNextFrame()
 {
     capture >> new_color_frame;
     if (new_color_frame.empty())
         return false;
+
     cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
+
     frame_count++;
     queue_count++;
-    if (queue_count > 2)
+    if (queue_count > queueIteration)
         queue_count = 1;
+
     return true;
 }
 
 void HumanTracker::calculateOpticalFlow(int flow_enum)
 {
-//    double t = (double)getTickCount();
     if (flow_enum == LUCAS_KANADA) {
         vector<float> err;
         TermCriteria criteria = TermCriteria((TermCriteria::COUNT) + (TermCriteria::EPS), 10, 0.03);
+
+        // Get Point2f from custom FPoint array
         vector<Point2f> point0;
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
+
         calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(21,21), 2, criteria, 0, 0.1);
-        int statusCount = 0;
-        for (int i = 0; i < status.size(); ++i)
-            if (status[i] == 0)
-                ++statusCount;
-        //cout << statusCount << endl;
     }
 
     if (flow_enum == RLOF) {
         vector<float> err;
-        vector<Point2f> point0;
         optflow::RLOFOpticalFlowParameter *rlofParam = new optflow::RLOFOpticalFlowParameter();
         rlofParam->solverType = optflow::ST_STANDART;
         rlofParam->supportRegionType = optflow::SR_FIXED;
@@ -165,21 +135,22 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         rlofParam->minEigenValue = 1e-3;
         rlofParam->globalMotionRansacThreshold = 20;
         Ptr<optflow::RLOFOpticalFlowParameter> rlofParamPtr(rlofParam);
+
+        // Get Point2f from custom FPoint array
+        vector<Point2f> point0;
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
 
         optflow::calcOpticalFlowSparseRLOF(old_frame_color, new_color_frame, point0, p1, status, err, rlofParamPtr, 0);
         old_frame_color = new_color_frame.clone();
     }
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << t << endl;
 }
 
 void HumanTracker::filterAndDrawPoint()
 {
-    int count = 0;
     for(int i = 0; i < p1.size(); i++)
     {
+        // Mark static point
         double delta = cv::norm(p1[i] - p0[i].pt);
         float treshold = 0.3;
         if (delta < treshold ) {
@@ -187,21 +158,20 @@ void HumanTracker::filterAndDrawPoint()
             continue;
         }
         p0[i].staticCount = 0;
-        // Draw
+
+        // Draw point
         if (showPoint)
-            //arrowedLine(new_color_frame, p0[i].pt, p1[i], p0[i].color, 1);
             circle(new_color_frame, p1[i], 2, p0[i].color, -1);
-        count++;
     }
+
+    // Fill FPoint array by new point's coordinate
     for (int i = 0; i < p1.size(); i++)
-        if (p1[i].x < old_frame.cols && p1[i].y < old_frame.rows
-                && p1[i].x >= 0 && p1[i].y >= 0)
+        if (p1[i].x < old_frame.cols && p1[i].y < old_frame.rows && p1[i].x >= 0 && p1[i].y >= 0)
             p0[i].pt = p1[i];
 }
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    int pauseTime = stepByStep ? 0 : waitkeyPause;
     add(new_color_frame, directionMask, new_color_frame);
     add(new_color_frame, lineMask, new_color_frame);
     add(new_color_frame, mergeMask, new_color_frame);
@@ -209,15 +179,19 @@ bool HumanTracker::showResult(bool stepByStep)
     cvtColor(grid, grid, COLOR_GRAY2BGR);
     add(new_color_frame, grid, new_color_frame);
     imshow("flow", new_color_frame);
+
     Mat analysis = new_color_frame.clone();
     add(analysis, patchCommMask, analysis);
     addAnomalyTitle(analysis);
     imshow("analysis", analysis);
-    video.write(analysis);
-    //imshow("info", info);
+
+    imshow("info", info);
+
+    old_frame = new_frame.clone();
+
+    int pauseTime = stepByStep ? 0 : waitkeyPause;
     if (waitKey(pauseTime) == 27)
         return stepByStep;
-    old_frame = new_frame.clone();
     return true;
 }
 
@@ -225,23 +199,18 @@ void HumanTracker::setDetector(int detector_enum)
 {
     switch (detector_enum) {
     case GFTT_Detector: {
-        // Увеличить количество точек: maxCorners+
         detector = GFTTDetector::create(500, 0.03, 3, 3, false, 0.03);
         break;
     }
     case FAST_Detector: {
-        // Увеличить количество точек: threshold-, type = TYPE_9_16
         detector = FastFeatureDetector::create(80, true, FastFeatureDetector::TYPE_9_16);
         break;
     }
     case AGAST_Detector: {
-        // Увеличить количество точек: threshold-, type = OAST_9_16
         detector = AgastFeatureDetector::create(40, false, AgastFeatureDetector::AGAST_7_12s);
         break;
     }
     case SimpleBlob_Detector: {
-        // Увеличить количество точек: minArea-
-        // Setup SimpleBlobDetector parameters.
         SimpleBlobDetector::Params params;
         // Change thresholds
         params.minThreshold = 20;
@@ -266,21 +235,14 @@ void HumanTracker::setDetector(int detector_enum)
         break;
     }
     case MSER_Detector: {
-        /*@param _delta it compares \f$(size_{i}-size_{i-delta})/size_{i-delta}\f$
-          @param _min_area prune the area which smaller than minArea
-          @param _max_area prune the area which bigger than maxArea
-          @param _max_variation prune the area have similar size to its children
-          Увеличить количество точек: delta-, max_variation+ */
         detector = MSER::create(1, 10, 60, 0.5);
         break;
     }
     case KAZE_Detector: {
-        // Увеличить количество точек: threshold-, diffusivity = DIFF_CHARBONNIER
         detector = KAZE::create(false, false, 0.001f, 4, 5, KAZE::DIFF_CHARBONNIER);
         break;
     }
     case AKAZE_Detector: {
-        // Увеличить количество точек: threshold-, diffusivity = DIFF_CHARBONNIER
         detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 100, 3, 0.0005f, 4, 2, KAZE::DIFF_CHARBONNIER);
         break;
     }
@@ -289,25 +251,22 @@ void HumanTracker::setDetector(int detector_enum)
 
 void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
 {
-    //double t = (double)getTickCount();
-
     if (queue_count != queue_index)
         return;
 
     detector->detect(frame, new_point);
 
-    fillPointMat(7);
+    // Adds only really new points
+    int oldPointArea = 7;
+    fillPointMat(oldPointArea);
     for (int i = 0; i < new_point.size(); i++) {
         if (point_mat.at<uchar>(new_point[i].pt.y, new_point[i].pt.x) == 255)
             continue;
         p0.push_back(FPoint(new_point[i].pt, frame_count));
-        circle(point_mat, new_point[i].pt, 7, Scalar(255), -1);
+        circle(point_mat, new_point[i].pt, oldPointArea, Scalar(255), -1);
     }
-    putInfo("Total point amount " + std::to_string(p0.size()), 1);
-    //imshow("occupied area", point_mat);
 
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << t << endl;
+    putInfo("Total point amount " + std::to_string(p0.size()), 1);
 }
 
 void HumanTracker::fillPointMat(int blockSize)
@@ -320,9 +279,9 @@ void HumanTracker::fillPointMat(int blockSize)
 
 void HumanTracker::deleteStaticPoint(int queue_index)
 {
-//    double t = (double)getTickCount();
     if (queue_count != queue_index)
         return;
+
     int count = 0;
     for (int i = p0.size() - 1; i >= 0; i--) {
         if (p0[i].staticCount >= 5) {
@@ -332,13 +291,11 @@ void HumanTracker::deleteStaticPoint(int queue_index)
         }
     }
     putInfo("Deleted static point " + std::to_string(count), 2);
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << t << endl;
 }
 
 void HumanTracker::putInfo(string text, int textY)
 {
-    textY *= 50;
+    textY *= 50; // Order of labels from top to bottom
     Rect rect(10, textY - 40, info.cols, 50);
     rectangle(info, rect, cv::Scalar(0), -1);
     cv::putText(info, text, cv::Point(10, textY), cv::FONT_HERSHEY_DUPLEX, 1.0, Scalar(255), 2);
@@ -346,8 +303,6 @@ void HumanTracker::putInfo(string text, int textY)
 
 void HumanTracker::addPointToPath(int queue_index)
 {
-//    double t = (double)getTickCount();
-
     if (queue_count != queue_index)
         return;
 
@@ -356,9 +311,7 @@ void HumanTracker::addPointToPath(int queue_index)
 
     approximatePath();
     drawPointPath();
-
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << "Time costs: " << t << endl;
+    showPathInfo(2);
 }
 
 void HumanTracker::drawPointPath()
@@ -369,12 +322,13 @@ void HumanTracker::drawPointPath()
     lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
     for (int i = 0; i < p0.size(); i++) {
         // Filter
-        if (p0[i].path.size() > 2) {
-            // Draw
-            for (int j = 1; j < p0[i].path.size(); j++)
-                line(lineMask, p0[i].path[j], p0[i].path[j - 1],
-                     Scalar(0, p0[i].averageVelocity * 255 / magnMax, 255 - p0[i].averageVelocity * 255 / magnMax), 2);
-        }
+        if (p0[i].path.size() < 3)
+            continue;
+
+        // Draw
+        for (int j = 1; j < p0[i].path.size(); j++)
+            line(lineMask, p0[i].path[j], p0[i].path[j - 1],
+                 Scalar(0, p0[i].averageVelocity * 255 / magnMax, 255 - p0[i].averageVelocity * 255 / magnMax), 2);
     }
 }
 
@@ -382,15 +336,18 @@ void HumanTracker::approximatePath()
 {
     if (showApproximatedPath)
         lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+
     if (showDirection)
         directionMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+
     vector<Point2f> apx;
     for (int i = 0; i < p0.size(); i++) {
         if (p0[i].path.size() > 2) {
             // Approximate
             double epsilon = 0.2 * arcLength(p0[i].path, false);
             approxPolyDP(p0[i].path, apx, epsilon, false);
-            // Filter
+
+            // Filter (if the trajectory is approximated in a straight line, occlusion has not occurred)
             p0[i].goodPath = apx.size() > 2 ? false : true;
             Scalar color = p0[i].goodPath
                          ? Scalar(0, p0[i].averageVelocity * 40, 255 - p0[i].averageVelocity * 40)
@@ -423,7 +380,8 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
         return;
 
     Point2f pointDirection;
-    double predictDiv = 1.5;
+    double predictDiv = 1.5; // smaller value -> longer vector in the image
+
     float p0x = apx[apx.size() - 2].x;
     float p1x = apx[apx.size() - 1].x;
     float deltax = p1x - p0x;
@@ -433,14 +391,17 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
     float p1y = apx[apx.size() - 1].y;
     float deltay = p1y - p0y;
     pointDirection.y = p1y + deltay / predictDiv;
+
     int angle = round(atan2(- deltay, deltax) * 180 / M_PI);
     if (angle < 0)
         angle = 360 + angle;
 
+    // Color coding of the direction
     Scalar dirColor = cvtAngleToBGR(angle);
     p0[index].color = dirColor;
     p0[index].dirColor = true;
 
+    // Draw
     if (showDirection)
         arrowedLine(directionMask, apx[apx.size() - 1], pointDirection, dirColor, 1);
 }
@@ -476,7 +437,6 @@ void HumanTracker::fillCoordinateToPatchID()
             rectangle(coordinateToPatchID,
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
                       Scalar(j * xPatchDim + i), -1);
-    //imshow("coordinateToPatchID", coordinateToPatchID);
 }
 
 void HumanTracker::fillGridMask()
@@ -485,10 +445,12 @@ void HumanTracker::fillGridMask()
     int yStep = gridMask.rows / yPatchDim;
     int x = xStep;
     int y = yStep;
+
     while (x < gridMask.cols) {
         line(gridMask, Point2f(x, 0), Point2f(x, gridMask.rows), Scalar(255), 1);
         x += xStep;
     }
+
     while (y < gridMask.rows) {
         line(gridMask, Point2f(0, y), Point2f(gridMask.cols, y), Scalar(255), 1);
         y += yStep;
@@ -505,7 +467,6 @@ void HumanTracker::fillPatches()
         int y = old_frame_color.rows / (2 * yPatchDim) + yIndex * old_frame_color.rows / yPatchDim;
 
         patches.push_back(Patch(Point2f(x, y)));
-        circle(gridMask, patches[i].center, 2, Scalar(0, 255, 0), -1);
     }
 }
 
@@ -532,17 +493,12 @@ void HumanTracker::fillGroundTruthIMG(string filename)
     VideoCapture captureGT(cap);
     Mat gt;
 
-
     while (true) {
         captureGT >> gt;
         if (gt.empty())
             break;
+
         cvtColor(gt, gt, COLOR_BGR2GRAY);
-
-//        Mat gtGRID = gt.clone();
-//        add(gtGRID, gridMask, gtGRID);
-//        imshow("gtGRID", gtGRID);
-
         vector<int> gtV;
         gtV.resize(xPatchDim * yPatchDim);
         for (int j = 0; j < gt.rows; ++j)
@@ -552,19 +508,6 @@ void HumanTracker::fillGroundTruthIMG(string filename)
 
         for (int i = 0; i < gtV.size(); ++i)
             groundTruth.push_back(gtV[i]);
-
-//        Mat gtShow = Mat::zeros(gt.size(), gt.type());
-//        int patchWidth = gt.cols / xPatchDim;
-//        int patchHeight = gt.rows / yPatchDim;
-
-//        for (int j = 0; j < yPatchDim; ++j)
-//            for (int i = 0; i < xPatchDim; ++i) {
-//                rectangle(gtShow,
-//                          Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
-//                          Scalar(255 * gtV[j * xPatchDim + i]), -1);
-//            }
-//        imshow("gtShow", gtShow);
-//        waitKey(0);
     }
 }
 
@@ -583,7 +526,6 @@ Scalar HumanTracker::cvtAngleToBGR(int angle)
 
 void HumanTracker::mergePointToObject(int queue_index, int chanels)
 {
-//    double t = (double)getTickCount();
     if (!showMergePoint)
         return;
 
@@ -600,9 +542,11 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
     cvtColor(mergeMask, mergeMaskHSV, COLOR_BGR2HSV);
     int angleStep = 180 / chanels;
     for (int i = 0; i < chanels; i++) {
+        // Сolor segmentation
         Mat inRangeMat = Mat::zeros(new_color_frame.size(), new_color_frame.type());
         inRange(mergeMaskHSV, Scalar(angleStep * i, 255, 255), Scalar(angleStep * (i + 1), 255, 255), inRangeMat);
 
+        // Сombining the nearest contours
         vector<vector<Point>> contours;
         cv::Mat rectKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 6));
         cv::Mat squareKernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
@@ -612,17 +556,17 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
         cv::erode(inRangeMat, inRangeMat, squareKernel);
         cv::findContours(inRangeMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
+        // Get convex hulls
         vector<vector<Point> > convexHulls(contours.size());
         for (unsigned int i = 0; i < contours.size(); i++)
             convexHull(contours[i], convexHulls[i]);
 
+        // Drawing the hulls with the average color of the sector
         Scalar color = Scalar(angleStep * i + angleStep / 2, 255, 255);
         drawContours(mergeMaskHSV, convexHulls, -1, color, -1);
     }
 
     cvtColor(mergeMaskHSV, mergeMask, COLOR_HSV2BGR);
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-//    cout << t << endl;
 }
 
 void HumanTracker::collectPathInfo(int index)
@@ -642,90 +586,16 @@ void HumanTracker::showPathInfo(int queue_index)
     putInfo("Average path life time " + std::to_string(averagePathLifeTime), 4);
 }
 
-void HumanTracker::updateMainStream(int queue_index)
-{
-//    double t = (double)getTickCount();
-    if (queue_count != queue_index)
-        return;
-
-    for (int i = 0; i < p0.size(); ++i) {
-        int x = static_cast<int>(p0[i].pt.x);
-        int y = static_cast<int>(p0[i].pt.y);
-
-        double b = mainStream.at<cv::Vec3b>(y, x)[0];
-        double g = mainStream.at<cv::Vec3b>(y, x)[1];
-        double r = mainStream.at<cv::Vec3b>(y, x)[2];
-
-        if (mainStreamCount.at<int>(y, x) > 500) {
-            mainStreamCount.at<int>(y, x) -= 100;
-        }
-        int count = mainStreamCount.at<int>(y, x);
-
-        b = b * count + p0[i].color[0];
-        g = g * count + p0[i].color[1];
-        r = r * count + p0[i].color[2];
-
-        count = ++mainStreamCount.at<int>(y, x);
-
-        b /= count;
-        b /= count;
-        b /= count;
-
-        mainStream.at<cv::Vec3b>(y, x)[0] = b;
-        mainStream.at<cv::Vec3b>(y, x)[1] = g;
-        mainStream.at<cv::Vec3b>(y, x)[2] = r;
-    }
-    imshow("mainStream", mainStream);
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-    //    cout << t << endl;
-}
-
 void HumanTracker::trajectoryAnalysis(int queue_index)
 {
-    //double t = (double)getTickCount();
-
-    if (!trajectoryAnalys)
-        return;
     if (queue_count != queue_index)
         return;
 
-    double abnormalTreshold = 30;
-    int initializationIterationsAmount = 8;
-    int averageSelectionSize = 50;
-    normalPointVelocityAmount = 0;
-    abnormalPointVelocityAmount = 0;
-
-    for (int i = 0; i < p0.size(); i++) {
-        if (p0[i].averageVelocity) {
-            double ratio = abs(p0[i].instantVelocity/p0[i].averageVelocity - 1) * 100;
-            ratio > abnormalTreshold ? ++abnormalPointVelocityAmount : ++normalPointVelocityAmount;
-        }
-    }
-
-    if (normalPointVelocityAmount != 0) {
-        double currentVelocityRatio = static_cast<double>(abnormalPointVelocityAmount)
-                                      /static_cast<double>(normalPointVelocityAmount);
-
-        if (averageVelocityRatio != 0 && currentVelocityRatio/averageVelocityRatio > 2.0 && averageVelocityRatioCount > initializationIterationsAmount)
-            ++abnormalOutliersFlag;
-        else {
-            abnormalOutliersFlag = 0;
-            averageVelocityRatio *= averageVelocityRatioCount;
-            averageVelocityRatio += currentVelocityRatio;
-            ++averageVelocityRatioCount;
-            if (averageVelocityRatioCount > averageSelectionSize) {
-                averageVelocityRatio -= averageVelocityRatio / averageVelocityRatioCount;
-                --averageVelocityRatioCount;
-            }
-            averageVelocityRatio /= averageVelocityRatioCount;
-        }
-
-        abnormalOutliersFlag > 1 ? putInfo("ABNORMAL behavior", 6) : putInfo("Normal behavior", 6);
-        //cout << currentVelocityRatio << "\t" << averageVelocityRatio << "\t" << averageVelocityRatioCount << endl;
-    }
-
-//    t = ((double)getTickCount() - t)/getTickFrequency();
-    //    cout << "Time costs: " << t << endl;
+    updateHOT(queue_index);
+    calcPatchHOT(queue_index);
+    calcPatchCommotion(queue_index);
+    showPatchGist(queue_index);
+    showPatchComm(queue_index);
 }
 
 void HumanTracker::updateHOT(int queue_index)
@@ -754,20 +624,20 @@ void HumanTracker::updateHOT(int queue_index)
         if (angle < 0) angle = 360 + angle;
         int angleShift = angleToShift[angle];
 
+        // Instead of an array of o*m elements, the position of 1 in the array is stored
         hstg = o * magnShift + angleShift;
-        //hstg = 1 << (o * magnShift + angleShift);
 
         p0[i].newHotCount++;
         if (p0[i].newHotCount > TL)
             p0[i].newHotCount = 1;
 
+        // Store only the latest TL hstg
         if (p0[i].path.size() < TL)
             p0[i].hot.push_back(hstg);
         else {
             p0[i].hot.erase(p0[i].hot.begin());
             p0[i].hot.push_back(hstg);
         }
-        //cout << "magn = " << magn << " angle = " << angle << " magnShift = " << magnShift << " angleShift = " << angleShift << " hist = " << hstg << endl;
     }
 }
 
@@ -777,9 +647,11 @@ void HumanTracker::calcPatchHOT(int queue_index)
         return;
 
     for (int i = 0; i < p0.size(); ++i) {
+        // Counts HOT only on new data
         if (p0[i].newHotCount != TL)
             continue;
 
+        // Coordinates of the center of the tracklet
         int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x) / 2.0;
         int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y) / 2.0;
 
@@ -789,6 +661,7 @@ void HumanTracker::calcPatchHOT(int queue_index)
         if (patches.at(patchID).isEmpty)
             patchInit(patchID);
 
+        // Add new data in HOT
         for (int j = 0; j < p0[i].hot.size(); ++j) {
             patches.at(patchID).lbt.at(o * m * j + p0[i].hot[j])++;
             patches.at(patchID).lbtLifeTime.at(o * m * j + p0[i].hot[j]) = 0;
@@ -801,33 +674,25 @@ void HumanTracker::calcPatchCommotion(int queue_index)
     if (queue_count != queue_index)
         return;
 
-    dataCollectionCount++;
-//    cout << dataCollectionCount << "\t";
-//    cout << fixed;
-//    cout.precision(2);
-
     double commSum = 0;
     for (int i = 0; i < patches.size(); ++i) {
         patches[i].updateComm();
         commSum += patches[i].comm;
 
-        if (captureMode == IMAGE_CAPTURE) {
+        // Filling the probability of anomaly and groundtruth for the current patch of the frame
+        if (anomalyType == LOCALIZATION) {
             prob.push_back(patches[i].comm);
             truth.push_back(groundTruth[(frame_count - 1) * xPatchDim * yPatchDim + i]);
         }
     }
-    if (captureMode == VIDEO_CAPTURE) {
+    // Filling the probability of anomaly and groundtruth for the current frame
+    if (anomalyType == DETECTION) {
         prob.push_back(commSum);
         truth.push_back(groundTruth[frame_count - 1]);
     }
 
-    if (commSum > 8.2)
-        anomaly = true;
-    else
-        anomaly = false;
-    //cout << "Суммарное возмужение в патчах " << commSum << "\t" << "Приращение возмущения" << commSum - globalComm << endl;
-    globalComm = commSum;
-    cout << commSum << endl;
+    double commSumTresh = 8.2;
+    commSum > commSumTresh ? anomaly = true : anomaly = false;
 }
 
 void HumanTracker::showPatchGist(int queue_index)
@@ -836,14 +701,13 @@ void HumanTracker::showPatchGist(int queue_index)
         return;
 
     bool L2Mode = false;
-
     Mat patchGist = Mat::zeros(old_frame_color.size(), old_frame_color.type());
     Mat grid = gridMask.clone();
     cvtColor(grid, grid, COLOR_GRAY2BGR);
     add(patchGist, grid, patchGist);
 
     for (int i = 0; i < patches.size(); ++i) {
-
+        // Calculates index of max value in patches[i].lbt and L2 for patches[i].lbt
         int jmax = -1;
         double L2 = 0;
         for (int j = 0; j < patches[i].lbt.size(); ++j) {
@@ -853,10 +717,13 @@ void HumanTracker::showPatchGist(int queue_index)
         }
         L2 = sqrt(L2);
 
+        // Calculates the coefficient(scaleM) for the correct display of the displacement value
         double xLength = new_frame.cols / (xPatchDim * 2);
         double yLength = new_frame.rows / (yPatchDim * 2);
         double scaleM = fmin(xLength, yLength) / magnMax;
 
+        // Draws each movement of patch[i].lbt from the center of the patch, preserving the angle and magnitude
+        // More green color -> more often this movement occurs in patch[i].lbt
         for (int j = 0; j < patches[i].lbt.size(); ++j) {
             if (patches[i].lbt[j] == 0)
                 continue;
@@ -873,6 +740,7 @@ void HumanTracker::showPatchGist(int queue_index)
             line(patchGist, patches[i].center, pt, Scalar(0, I/2, (255 - I) / 2), 2);
         }
 
+        // Re-draws the most popular direction on top of others for a better perception
         if (jmax != -1) {
             double ojmax = patches[i].indexToAngle[patches[i].getLocalIndex(jmax).second];
             double mjmax = scaleM * patches[i].indexToMagnitude[patches[i].getLocalIndex(jmax).first];
@@ -900,12 +768,13 @@ void HumanTracker::showPatchComm(int queue_index)
     patchCommMask = Mat::zeros(patchCommMask.size(), patchCommMask.type());
     for (int j = 0; j < yPatchDim; ++j)
         for (int i = 0; i < xPatchDim; ++i) {
+            // More red(r) -> higher probability of an abnormal event in the patch
             double r = 255.0 * patches[j * xPatchDim + i].comm / commTreshToShow;
-
             rectangle(patchCommMask,
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
                       Scalar(255 - r, 0, r), -1);
         }
+
     Mat patchCommMaskShow = patchCommMask.clone();
     Mat grid = gridMask.clone();
     cvtColor(grid, grid, COLOR_GRAY2BGR);
@@ -918,11 +787,13 @@ void HumanTracker::patchInit(int index)
     if (!predictPatchLBT)
         return;
 
+    // Finds all neighbors of the patch depending on the mode (bigPatchInit)
     vector<int> neighbors;
     bool left = index % xPatchDim != 0;
     bool right = (index + 1) % xPatchDim != 0;
     bool top = index - xPatchDim >= 0;
     bool down = index + xPatchDim < xPatchDim * yPatchDim;
+
     if (left)
         neighbors.push_back(index - 1);
     if (right)
@@ -943,6 +814,8 @@ void HumanTracker::patchInit(int index)
             neighbors.push_back(index + xPatchDim + 1);
     }
 
+    // Add the most popular moves from neighboring patches to the patch
+    // The popularity of moves can be resize by the patchInitWeight
     for (int i = 0; i < neighbors.size(); i++) {
         if (patches.at(neighbors[i]).isEmpty)
             continue;
@@ -976,27 +849,6 @@ void HumanTracker::addAnomalyTitle(Mat &img)
     string text = anomaly ? "Abnormal behavior" : "Normal behavior";
     rectangle(img, rect, color, -1);
     cv::putText(img, text, cv::Point(30, 30), cv::FONT_HERSHEY_DUPLEX, 0.5, Scalar(0), 2);
-}
-
-void HumanTracker::exportParametrs(double observed, string filename)
-{
-    if (!isExportResult)
-        return;
-
-    ofstream fout("/home/urii/Документы/DataSet/txt/filename.txt");
-    fout << filename << endl;
-    fout.close();
-
-    int avgPointAmount = usfullPointAmount / usfullPointCount;
-    int avgPathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
-    int avgFPS = frame_count / computingTimeCost;
-
-    fout.open(filename, std::ios::app);
-    fout << observed;
-    fout << "," << avgPointAmount;
-    fout << "," << avgPathLifeTime;
-    fout << "," << avgFPS;
-    fout.close();
 }
 
 FPoint::FPoint()
@@ -1040,6 +892,7 @@ Scalar FPoint::generateColor()
 
 void FPoint::updatePath()
 {
+    // Store only the latest TL points
     if (path.size() < TL)
         path.push_back(pt);
     else {
@@ -1051,7 +904,7 @@ void FPoint::updatePath()
 
 void FPoint::updateVelocity()
 {
-    int instancePointAmount = 3;
+    int instancePointAmount = 3; // The number of points to calculate the instantaneous speed
     if (path.size() < instancePointAmount + 2)
         return;
 
@@ -1084,6 +937,7 @@ Patch::Patch(Point2f pt)
 
 void Patch::updateComm()
 {
+    // Calculates index of max value in lbt and L2 for lbt
     double L2 = 0;
     int jmax = 0;
     for (int i = 0; i < lbt.size(); ++i) {
@@ -1095,27 +949,17 @@ void Patch::updateComm()
     L2 = sqrt(L2);
     isEmpty = (L2 < 1);
 
+    // Calculates commotion
     comm = 0;
-    double magnM = 0;//
-    double magnJmax = indexToMagnitude[getLocalIndex(jmax).first];
     for (int j = 0; j < lbt.size(); ++j) {
         if (lbt[j] == 0)
             continue;
-        assert(lbt[j] > 0);
         if (lbtLifeTime[j] > lbtLifeTimeDelta)
             lbtResetLifeTime ? lbt[j] = 0 : lbt[j]--;
-        assert(L2 > 0);
         double currComm = getIndexWeight(j, jmax) * pow((lbt[j] - lbt[jmax]) / L2, 2);
-        assert(currComm >= 0 && currComm <= 1);
         comm += currComm;
         lbtLifeTime[j]++;
-        double mag = indexToMagnitude[getLocalIndex(j).first];//
-        if (mag > magnM)//
-            magnM = mag;//
     }
-//    cout << fixed;//
-//    cout.precision(0);//
-//    cout << magnJmax * 10 << "|" << magnM * 10 << " ";//
 }
 
 double Patch::getIndexWeight(int j, int jmax)
@@ -1126,27 +970,40 @@ double Patch::getIndexWeight(int j, int jmax)
     double mj = indexToMagnitude[getLocalIndex(j).first];
     double mjmax = indexToMagnitude[getLocalIndex(jmax).first];
 
+    // If the abnormal behavior is the most different from the average
 //    double dMmax = mjmax > magnMax / 2 ? mjmax : magnMax - mjmax;
 //    double dM = std::abs(mj - mjmax);
+
+    // If the abnormal behavior is faster than average
     double dMmax = magnMax - mjmax;
     double dM = mj - mjmax;
-    assert(dMmax > dM - 1e-2);
 
     double dOmax = M_PI;
     double dO = std::abs(oj - ojmax);
     dO = dO > M_PI ? 2 * M_PI - dO : dO;
-    assert(dOmax >= dO);
 
-    double sigO = dOmax / 6.0; //1.0 / o;
-    double sigM = dMmax / 6.0; //1.0 / m;
-    assert(sigM > 0 && sigO > 0);
+    double sigO = dOmax / 6.0;
+    double sigM = dMmax / 6.0;
 
-    double A = 1; // 1 / (2 * M_PI * sigO * sigM);
+    double A = 1;
     double B = (pow(dO - dOmax, 2)) / (2 * pow(sigO, 2));
     double C = (pow(dM - dMmax, 2)) / (2 * pow(sigM, 2));
 
-    double weight = magnMode ? A * exp(-1 * C) : A * exp(-1 * B - C);
-
+    double weight = 0;
+    switch (anomalyCalcMode) {
+    case MAGNITUDE:
+        weight = A * exp(-1 * C);
+        break;
+    case DIRECTION:
+        weight = A * exp(-1 * B);
+        break;
+    case BOTH:
+        weight = A * exp(-1 * B - C);
+        break;
+    default:
+        weight = A * exp(-1 * B - C);
+        break;
+    }
     return weight;
 }
 

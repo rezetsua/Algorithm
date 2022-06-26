@@ -72,7 +72,7 @@ void Measurement::singleShot(const string &filename, int flow, int detector, int
     tracker.startTracking();
     string  expFileName = "/home/urii/Документы/DataSet/Experiments/UMN/";
     expFileName += "123.Avangers2.RLOF.txt";
-    tracker.exportParametrs(tracker.obsParam, expFileName);
+    //tracker.exportParametrs(tracker.obsParam, expFileName);
     double maxValue = 0;
     for (int i = 0; i < tracker.prob.size(); ++i)
         if (tracker.prob[i] > maxValue)
