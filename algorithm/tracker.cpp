@@ -112,7 +112,7 @@ void HumanTracker::startTracking()
     }
 
     printInfo();
-    //waitKey(0);
+    waitKey(0);
 }
 
 
@@ -423,7 +423,7 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
         return;
 
     Point2f pointDirection;
-    int predictDiv = 4;
+    double predictDiv = 1.5;
     float p0x = apx[apx.size() - 2].x;
     float p1x = apx[apx.size() - 1].x;
     float deltax = p1x - p0x;
@@ -837,8 +837,10 @@ void HumanTracker::showPatchGist(int queue_index)
 
     bool L2Mode = false;
 
-    Mat patchGist = Mat::zeros(gridMask.size(), gridMask.type());
-    add(patchGist, gridMask, patchGist);
+    Mat patchGist = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    Mat grid = gridMask.clone();
+    cvtColor(grid, grid, COLOR_GRAY2BGR);
+    add(patchGist, grid, patchGist);
 
     for (int i = 0; i < patches.size(); ++i) {
 
@@ -868,7 +870,7 @@ void HumanTracker::showPatchGist(int queue_index)
             int y = - mj * sin(oj);
             Point2f pt(patches[i].center.x + x, patches[i].center.y + y);
 
-            line(patchGist, patches[i].center, pt, Scalar(I), 2);
+            line(patchGist, patches[i].center, pt, Scalar(0, I/2, (255 - I) / 2), 2);
         }
 
         if (jmax != -1) {
@@ -880,7 +882,7 @@ void HumanTracker::showPatchGist(int queue_index)
             int y = - mjmax * sin(ojmax);
             Point2f pt(patches[i].center.x + x, patches[i].center.y + y);
 
-            line(patchGist, patches[i].center, pt, Scalar(I), 2);
+            line(patchGist, patches[i].center, pt, Scalar(0, I, (255 - I) / 2), 2);
         }
     }
 
@@ -1111,9 +1113,9 @@ void Patch::updateComm()
         if (mag > magnM)//
             magnM = mag;//
     }
-    cout << fixed;//
-    cout.precision(0);//
-    cout << magnJmax * 10 << "|" << magnM * 10 << " ";//
+//    cout << fixed;//
+//    cout.precision(0);//
+//    cout << magnJmax * 10 << "|" << magnM * 10 << " ";//
 }
 
 double Patch::getIndexWeight(int j, int jmax)

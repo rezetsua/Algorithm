@@ -36,7 +36,7 @@ const bool magnMode = false;
 
 const bool isExportResult = false;
 
-const int waitkeyPause = 1;
+const int waitkeyPause = 30;
 const bool showPoint = false;
 const bool showPath = true;
 const bool showApproximatedPath = false;
