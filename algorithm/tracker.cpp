@@ -5,8 +5,8 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
     this->captureMode = captureMode;
     flowType = flow;
     setDetector(detector);
-    frame_count = 1;
-    queue_count = 1;
+    frameCount = 1;
+    queueCount = 1;
     deletedGoodPathAmount = 0;
     goodPathLifeTimeSum = 0;
 
@@ -24,17 +24,17 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
     }
     if (!capture.isOpened())
         cerr << "Unable to open file!" << endl;
-    capture >> old_frame_color;
+    capture >> oldFrameColor;
 
-    lineMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
-    directionMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
-    mergeMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
-    patchCommMask = Mat::zeros(old_frame_color.size(), old_frame_color.type());
-    gridMask = Mat::zeros(old_frame_color.size(), CV_8UC1);
-    cvtColor(old_frame_color, old_frame, COLOR_BGR2GRAY);
-    info = Mat::zeros(480, 480, old_frame.type());
-    point_mat = Mat::zeros(old_frame.size(), old_frame.type());
-    coordinateToPatchID = Mat::zeros(old_frame.size(), old_frame.type());
+    lineMask = Mat::zeros(oldFrameColor.size(), oldFrameColor.type());
+    directionMask = Mat::zeros(oldFrameColor.size(), oldFrameColor.type());
+    mergeMask = Mat::zeros(oldFrameColor.size(), oldFrameColor.type());
+    patchCommMask = Mat::zeros(oldFrameColor.size(), oldFrameColor.type());
+    gridMask = Mat::zeros(oldFrameColor.size(), CV_8UC1);
+    cvtColor(oldFrameColor, oldFrame, COLOR_BGR2GRAY);
+    info = Mat::zeros(480, 480, oldFrame.type());
+    pointMat = Mat::zeros(oldFrame.size(), oldFrame.type());
+    coordinateToPatchID = Mat::zeros(oldFrame.size(), oldFrame.type());
 
     fillHSV2BGR();
     fillAngleToShift();
@@ -43,7 +43,7 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
     fillPatches();
 
     // Makes first detection for flow algorithm
-    detectNewPoint(old_frame, 1);
+    detectNewPoint(oldFrame, 1);
 }
 
 void HumanTracker::stopTracking()
@@ -63,7 +63,7 @@ void HumanTracker::startTracking()
 
         calculateOpticalFlow(flowType);
 
-        detectNewPoint(new_frame, 1);
+        detectNewPoint(newFrame, 1);
 
         filterAndDrawPoint();
 
@@ -77,7 +77,7 @@ void HumanTracker::startTracking()
 
         double dt = ((double)getTickCount() - t)/getTickFrequency();
         computingTimeCost += dt;
-        if (frame_count % 10 == 0)
+        if (frameCount % 10 == 0)
             putInfo("FPS " + std::to_string((int)(1/dt)), 5);
 
         if (!showResult(false)) break;
@@ -89,16 +89,16 @@ void HumanTracker::startTracking()
 
 bool HumanTracker::getNextFrame()
 {
-    capture >> new_color_frame;
-    if (new_color_frame.empty())
+    capture >> newColorFrame;
+    if (newColorFrame.empty())
         return false;
 
-    cvtColor(new_color_frame, new_frame, COLOR_BGR2GRAY);
+    cvtColor(newColorFrame, newFrame, COLOR_BGR2GRAY);
 
-    frame_count++;
-    queue_count++;
-    if (queue_count > queueIteration)
-        queue_count = 1;
+    frameCount++;
+    queueCount++;
+    if (queueCount > queueIteration)
+        queueCount = 1;
 
     return true;
 }
@@ -114,7 +114,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
 
-        calcOpticalFlowPyrLK(old_frame, new_frame, point0, p1, status, err, Size(21,21), 2, criteria, 0, 0.1);
+        calcOpticalFlowPyrLK(oldFrame, newFrame, point0, p1, status, err, Size(21,21), 2, criteria, 0, 0.1);
     }
 
     if (flow_enum == RLOF) {
@@ -141,8 +141,8 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
         for (int i = 0; i < p0.size(); i++)
             point0.push_back(p0[i].pt);
 
-        optflow::calcOpticalFlowSparseRLOF(old_frame_color, new_color_frame, point0, p1, status, err, rlofParamPtr, 0);
-        old_frame_color = new_color_frame.clone();
+        optflow::calcOpticalFlowSparseRLOF(oldFrameColor, newColorFrame, point0, p1, status, err, rlofParamPtr, 0);
+        oldFrameColor = newColorFrame.clone();
     }
 }
 
@@ -161,33 +161,33 @@ void HumanTracker::filterAndDrawPoint()
 
         // Draw point
         if (showPoint)
-            circle(new_color_frame, p1[i], 2, p0[i].color, -1);
+            circle(newColorFrame, p1[i], 2, p0[i].color, -1);
     }
 
     // Fill FPoint array by new point's coordinate
     for (int i = 0; i < p1.size(); i++)
-        if (p1[i].x < old_frame.cols && p1[i].y < old_frame.rows && p1[i].x >= 0 && p1[i].y >= 0)
+        if (p1[i].x < oldFrame.cols && p1[i].y < oldFrame.rows && p1[i].x >= 0 && p1[i].y >= 0)
             p0[i].pt = p1[i];
 }
 
 bool HumanTracker::showResult(bool stepByStep)
 {
-    add(new_color_frame, directionMask, new_color_frame);
-    add(new_color_frame, lineMask, new_color_frame);
-    add(new_color_frame, mergeMask, new_color_frame);
+    add(newColorFrame, directionMask, newColorFrame);
+    add(newColorFrame, lineMask, newColorFrame);
+    add(newColorFrame, mergeMask, newColorFrame);
     Mat grid = gridMask.clone();
     cvtColor(grid, grid, COLOR_GRAY2BGR);
-    add(new_color_frame, grid, new_color_frame);
-    imshow("flow", new_color_frame);
+    add(newColorFrame, grid, newColorFrame);
+    imshow("flow", newColorFrame);
 
-    Mat analysis = new_color_frame.clone();
+    Mat analysis = newColorFrame.clone();
     add(analysis, patchCommMask, analysis);
     addAnomalyTitle(analysis);
     imshow("analysis", analysis);
 
     imshow("info", info);
 
-    old_frame = new_frame.clone();
+    oldFrame = newFrame.clone();
 
     int pauseTime = stepByStep ? 0 : waitkeyPause;
     if (waitKey(pauseTime) == 27)
@@ -251,19 +251,19 @@ void HumanTracker::setDetector(int detector_enum)
 
 void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
-    detector->detect(frame, new_point);
+    detector->detect(frame, newPoint);
 
     // Adds only really new points
     int oldPointArea = 7;
     fillPointMat(oldPointArea);
-    for (int i = 0; i < new_point.size(); i++) {
-        if (point_mat.at<uchar>(new_point[i].pt.y, new_point[i].pt.x) == 255)
+    for (int i = 0; i < newPoint.size(); i++) {
+        if (pointMat.at<uchar>(newPoint[i].pt.y, newPoint[i].pt.x) == 255)
             continue;
-        p0.push_back(FPoint(new_point[i].pt, frame_count));
-        circle(point_mat, new_point[i].pt, oldPointArea, Scalar(255), -1);
+        p0.push_back(FPoint(newPoint[i].pt, frameCount));
+        circle(pointMat, newPoint[i].pt, oldPointArea, Scalar(255), -1);
     }
 
     putInfo("Total point amount " + std::to_string(p0.size()), 1);
@@ -271,15 +271,15 @@ void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
 
 void HumanTracker::fillPointMat(int blockSize)
 {
-    point_mat = Mat::zeros(old_frame.size(), old_frame.type());
+    pointMat = Mat::zeros(oldFrame.size(), oldFrame.type());
     for (int i = 0; i < p0.size(); i++) {
-        circle(point_mat, p0[i].pt, blockSize, Scalar(255), -1);
+        circle(pointMat, p0[i].pt, blockSize, Scalar(255), -1);
     }
 }
 
 void HumanTracker::deleteStaticPoint(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     int count = 0;
@@ -303,7 +303,7 @@ void HumanTracker::putInfo(string text, int textY)
 
 void HumanTracker::addPointToPath(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     for (int i = 0; i < p0.size(); i++)
@@ -319,7 +319,7 @@ void HumanTracker::drawPointPath()
     if (!showPath)
         return;
 
-    lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    lineMask = Mat::zeros(newColorFrame.size(), newColorFrame.type());
     for (int i = 0; i < p0.size(); i++) {
         // Filter
         if (p0[i].path.size() < 3)
@@ -335,10 +335,10 @@ void HumanTracker::drawPointPath()
 void HumanTracker::approximatePath()
 {
     if (showApproximatedPath)
-        lineMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+        lineMask = Mat::zeros(newColorFrame.size(), newColorFrame.type());
 
     if (showDirection)
-        directionMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+        directionMask = Mat::zeros(newColorFrame.size(), newColorFrame.type());
 
     vector<Point2f> apx;
     for (int i = 0; i < p0.size(); i++) {
@@ -463,8 +463,8 @@ void HumanTracker::fillPatches()
         int xIndex = i % xPatchDim;
         int yIndex = i / xPatchDim;
 
-        int x = old_frame_color.cols / (2 * xPatchDim) + xIndex * old_frame_color.cols / xPatchDim;
-        int y = old_frame_color.rows / (2 * yPatchDim) + yIndex * old_frame_color.rows / yPatchDim;
+        int x = oldFrameColor.cols / (2 * xPatchDim) + xIndex * oldFrameColor.cols / xPatchDim;
+        int y = oldFrameColor.rows / (2 * yPatchDim) + yIndex * oldFrameColor.rows / yPatchDim;
 
         patches.push_back(Patch(Point2f(x, y)));
     }
@@ -529,21 +529,21 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
     if (!showMergePoint)
         return;
 
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     // Draw point
-    mergeMask = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    mergeMask = Mat::zeros(newColorFrame.size(), newColorFrame.type());
     for (int i = 0; i < p0.size(); i++)
         if (p0[i].dirColor)
             circle(mergeMask, p0[i].pt, 4, p0[i].color, -1);
 
-    Mat mergeMaskHSV = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+    Mat mergeMaskHSV = Mat::zeros(newColorFrame.size(), newColorFrame.type());
     cvtColor(mergeMask, mergeMaskHSV, COLOR_BGR2HSV);
     int angleStep = 180 / chanels;
     for (int i = 0; i < chanels; i++) {
         // Сolor segmentation
-        Mat inRangeMat = Mat::zeros(new_color_frame.size(), new_color_frame.type());
+        Mat inRangeMat = Mat::zeros(newColorFrame.size(), newColorFrame.type());
         inRange(mergeMaskHSV, Scalar(angleStep * i, 255, 255), Scalar(angleStep * (i + 1), 255, 255), inRangeMat);
 
         // Сombining the nearest contours
@@ -574,13 +574,13 @@ void HumanTracker::collectPathInfo(int index)
     if (!p0[index].dirColor)
         return;
 
-    goodPathLifeTimeSum += frame_count - p0[index].originFrameCount;
+    goodPathLifeTimeSum += frameCount - p0[index].originFrameCount;
     deletedGoodPathAmount++;
 }
 
 void HumanTracker::showPathInfo(int queue_index)
 {
-    if (queue_count != queue_index || deletedGoodPathAmount == 0)
+    if (queueCount != queue_index || deletedGoodPathAmount == 0)
         return;
     int averagePathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
     putInfo("Average path life time " + std::to_string(averagePathLifeTime), 4);
@@ -588,7 +588,7 @@ void HumanTracker::showPathInfo(int queue_index)
 
 void HumanTracker::trajectoryAnalysis(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     updateHOT(queue_index);
@@ -600,7 +600,7 @@ void HumanTracker::trajectoryAnalysis(int queue_index)
 
 void HumanTracker::updateHOT(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     uint32_t hstg = 0;
@@ -643,7 +643,7 @@ void HumanTracker::updateHOT(int queue_index)
 
 void HumanTracker::calcPatchHOT(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     for (int i = 0; i < p0.size(); ++i) {
@@ -655,7 +655,7 @@ void HumanTracker::calcPatchHOT(int queue_index)
         int cX = p0[i].path[0].x + (p0[i].path[TL - 1].x - p0[i].path[0].x) / 2.0;
         int cY = p0[i].path[0].y + (p0[i].path[TL - 1].y - p0[i].path[0].y) / 2.0;
 
-        assert((cX < old_frame.cols && cY < old_frame.rows && cX >= 0 && cY >= 0));
+        assert((cX < oldFrame.cols && cY < oldFrame.rows && cX >= 0 && cY >= 0));
 
         int patchID = coordinateToPatchID.at<uchar>(cY, cX);
         if (patches.at(patchID).isEmpty)
@@ -671,7 +671,7 @@ void HumanTracker::calcPatchHOT(int queue_index)
 
 void HumanTracker::calcPatchCommotion(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     double commSum = 0;
@@ -682,26 +682,25 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         // Filling the probability of anomaly and groundtruth for the current patch of the frame
         if (anomalyType == LOCALIZATION) {
             prob.push_back(patches[i].comm);
-            truth.push_back(groundTruth[(frame_count - 1) * xPatchDim * yPatchDim + i]);
+            truth.push_back(groundTruth[(frameCount - 1) * xPatchDim * yPatchDim + i]);
         }
     }
     // Filling the probability of anomaly and groundtruth for the current frame
     if (anomalyType == DETECTION) {
         prob.push_back(commSum);
-        truth.push_back(groundTruth[frame_count - 1]);
+        truth.push_back(groundTruth[frameCount - 1]);
     }
 
-    double commSumTresh = 8.2;
-    commSum > commSumTresh ? anomaly = true : anomaly = false;
+    commSum > commFrameTresh ? anomaly = true : anomaly = false;
 }
 
 void HumanTracker::showPatchGist(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     bool L2Mode = false;
-    Mat patchGist = Mat::zeros(old_frame_color.size(), old_frame_color.type());
+    Mat patchGist = Mat::zeros(oldFrameColor.size(), oldFrameColor.type());
     Mat grid = gridMask.clone();
     cvtColor(grid, grid, COLOR_GRAY2BGR);
     add(patchGist, grid, patchGist);
@@ -718,8 +717,8 @@ void HumanTracker::showPatchGist(int queue_index)
         L2 = sqrt(L2);
 
         // Calculates the coefficient(scaleM) for the correct display of the displacement value
-        double xLength = new_frame.cols / (xPatchDim * 2);
-        double yLength = new_frame.rows / (yPatchDim * 2);
+        double xLength = newFrame.cols / (xPatchDim * 2);
+        double yLength = newFrame.rows / (yPatchDim * 2);
         double scaleM = fmin(xLength, yLength) / magnMax;
 
         // Draws each movement of patch[i].lbt from the center of the patch, preserving the angle and magnitude
@@ -759,7 +758,7 @@ void HumanTracker::showPatchGist(int queue_index)
 
 void HumanTracker::showPatchComm(int queue_index)
 {
-    if (queue_count != queue_index)
+    if (queueCount != queue_index)
         return;
 
     int patchWidth = patchCommMask.cols / xPatchDim;
@@ -769,7 +768,7 @@ void HumanTracker::showPatchComm(int queue_index)
     for (int j = 0; j < yPatchDim; ++j)
         for (int i = 0; i < xPatchDim; ++i) {
             // More red(r) -> higher probability of an abnormal event in the patch
-            double r = 255.0 * patches[j * xPatchDim + i].comm / commTreshToShow;
+            double r = 255.0 * patches[j * xPatchDim + i].comm / commPatchTresh;
             rectangle(patchCommMask,
                       Rect(patchWidth * i, patchHeight * j, patchWidth, patchHeight),
                       Scalar(255 - r, 0, r), -1);
@@ -835,7 +834,7 @@ void HumanTracker::printInfo()
 {
     int avgPathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
     int avgPointAmount = usfullPointAmount / usfullPointCount;
-    int avgFPS = frame_count / computingTimeCost;
+    int avgFPS = frameCount / computingTimeCost;
 
     cout << "Average usfull point amount = " << avgPointAmount << endl;
     cout << "Average path life time = " << avgPathLifeTime << endl;
