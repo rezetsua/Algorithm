@@ -511,6 +511,25 @@ void HumanTracker::fillGroundTruthIMG(string filename)
     }
 }
 
+void HumanTracker::exportProbToFile(string output)
+{
+    normalize(prob, prob, 1, 0, NORM_MINMAX);
+    ofstream fout(output, std::ios::app);
+    fout << fixed;
+    fout.precision(32);
+    for (int i = 0; i < prob.size(); ++i)
+        fout << prob[i] << endl;
+    fout.close();
+}
+
+void HumanTracker::exportGtToFile(string output)
+{
+    ofstream fout(output, std::ios::app);
+    for (int i = 0; i < truth.size(); ++i)
+        fout << truth[i] << endl;
+    fout.close();
+}
+
 Scalar HumanTracker::cvtAngleToBGR(int angle)
 {
     if (angle > 360 || angle < 0)

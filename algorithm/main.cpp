@@ -1,25 +1,13 @@
 #include "tracker.h"
-#include "measurement.h"
 
 int main()
 {
     HumanTracker tracker("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::LUCAS_KANADA,
                          Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
+
     tracker.startTracking();
-
-//    Measurement m;
-//    // Tracking
-
-//    fstream clear_file1("/home/urii/Документы/DataSet/txt/proba.txt", ios::out);
-//    clear_file1.close();
-//    fstream clear_file2("/home/urii/Документы/DataSet/txt/truth.txt", ios::out);
-//    clear_file2.close();
-
-//    m.singleShot("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::LUCAS_KANADA,
-//                 Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
-
-////    m.singleShot("/home/urii/Документы/DataSet/ped1/Test019/001.tif",
-////                 Detectors::GFTT_Detector, CaptureMode::IMAGE_CAPTURE);
+    tracker.exportProbToFile("/home/urii/Документы/DataSet/UMN/123sceneProb.txt");
+    tracker.exportGtToFile("/home/urii/Документы/DataSet/UMN/123sceneGT.txt");
 
     return 0;
 }

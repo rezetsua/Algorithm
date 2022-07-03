@@ -79,7 +79,7 @@ const bool showPath = true;
 const bool showApproximatedPath = false;
 const bool showDirection = false;
 const bool showMergePoint = false;
-const int waitkeyPause = 30;
+const int waitkeyPause = 10;
 
 class FPoint
 {
@@ -132,6 +132,8 @@ public:
 public:
     void startTracking();
     void stopTracking();
+    void exportProbToFile(string output);
+    void exportGtToFile(string output);
 
 private:
     bool getNextFrame();
@@ -173,12 +175,6 @@ private:
     void fillGroundTruthTXT(string filename); // frame -> anomaly groundtruth
     void fillGroundTruthIMG(string filename); // patch -> anomaly groundtruth
 
-
-public:
-    bool running;
-    vector<double> prob; // Probability of anomaly
-    vector<int> truth; // Anomaly groundtruth
-
 private:
     Mat oldFrame;
     Mat oldFrameColor;
@@ -201,6 +197,8 @@ private:
     vector<uchar> status;
     vector<int> angleToShift;
     vector<Scalar> angleToBGR;
+    vector<double> prob; // Probability of anomaly
+    vector<int> truth; // Anomaly groundtruth
 
     VideoCapture capture;
     Ptr<cv::Feature2D> detector;
@@ -210,6 +208,7 @@ private:
     unsigned int frameCount;
     int queueCount; // "Multithreading" counter
     bool anomaly = false; // is current frame has an anomaly
+    bool running;
 
     // Info
     long long deletedGoodPathAmount = 0;
