@@ -72,6 +72,7 @@ const bool lbtResetLifeTime = false; // After the lbtLifeTimeDelta, the pattern 
 const int anomalyType = AnomalyType::DETECTION;
 const int anomalyCalcMode = AnomalyCalcMode::BOTH;
 const int queueIteration = 2; // "Threads" amount
+const bool useGroundTruth = false; // Get GT from .txt or .bmp and will generate a 2 txt files with the probability of an anomaly on the current frame/patch and GT
 
 // Visualization
 const bool showPoint = false;

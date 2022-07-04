@@ -2,12 +2,14 @@
 
 int main()
 {
-    HumanTracker tracker("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::LUCAS_KANADA,
+    HumanTracker tracker("/home/urii/Документы/DataSet/23scene.mp4", Flow::LUCAS_KANADA,
                          Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
 
     tracker.startTracking();
-    tracker.exportProbToFile("/home/urii/Документы/DataSet/UMN/123sceneProb.txt");
-    tracker.exportGtToFile("/home/urii/Документы/DataSet/UMN/123sceneGT.txt");
+
+    // If the algorithm was given a GT
+    tracker.exportProbToFile("/home/urii/Документы/DataSet/123sceneProb.txt");
+    tracker.exportGtToFile("/home/urii/Документы/DataSet/123sceneGT.txt");
 
     return 0;
 }

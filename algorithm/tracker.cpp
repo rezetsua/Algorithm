@@ -12,7 +12,7 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
 
     if (captureMode == VIDEO_CAPTURE) {
         capture.open(filename);
-        fillGroundTruthTXT(filename);
+        if (useGroundTruth) fillGroundTruthTXT(filename);
     }
     else if (captureMode == IMAGE_CAPTURE) {
         size_t found = filename.find_last_of(".");
@@ -20,7 +20,7 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
         found = filename.find_last_of("/");
         string cap = filename.substr(0, found) + "/%03d" + format;
         capture.open(cap);
-        fillGroundTruthIMG(filename);
+        if (useGroundTruth) fillGroundTruthIMG(filename);
     }
     if (!capture.isOpened())
         cerr << "Unable to open file!" << endl;
@@ -701,13 +701,13 @@ void HumanTracker::calcPatchCommotion(int queue_index)
         // Filling the probability of anomaly and groundtruth for the current patch of the frame
         if (anomalyType == LOCALIZATION) {
             prob.push_back(patches[i].comm);
-            truth.push_back(groundTruth[(frameCount - 1) * xPatchDim * yPatchDim + i]);
+            if (useGroundTruth) truth.push_back(groundTruth[(frameCount - 1) * xPatchDim * yPatchDim + i]);
         }
     }
     // Filling the probability of anomaly and groundtruth for the current frame
     if (anomalyType == DETECTION) {
         prob.push_back(commSum);
-        truth.push_back(groundTruth[frameCount - 1]);
+        if (useGroundTruth) truth.push_back(groundTruth[frameCount - 1]);
     }
 
     commSum > commFrameTresh ? anomaly = true : anomaly = false;
