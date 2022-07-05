@@ -1,6 +1,6 @@
-#include "tracker.h"
+#include "anomaly_detector.h"
 
-HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int captureMode)
+AnomalyDetector::AnomalyDetector(const string& filename, int flow,  int detector, int captureMode)
 {
     this->captureMode = captureMode;
     flowType = flow;
@@ -46,12 +46,12 @@ HumanTracker::HumanTracker(const string& filename, int flow,  int detector, int 
     detectNewPoint(oldFrame, 1);
 }
 
-void HumanTracker::stopTracking()
+void AnomalyDetector::stopAnalysis()
 {
     running = false;
 }
 
-void HumanTracker::startTracking()
+void AnomalyDetector::startAnalysis()
 {
     running = true;
 
@@ -87,7 +87,7 @@ void HumanTracker::startTracking()
     waitKey(0);
 }
 
-bool HumanTracker::getNextFrame()
+bool AnomalyDetector::getNextFrame()
 {
     capture >> newColorFrame;
     if (newColorFrame.empty())
@@ -103,7 +103,7 @@ bool HumanTracker::getNextFrame()
     return true;
 }
 
-void HumanTracker::calculateOpticalFlow(int flow_enum)
+void AnomalyDetector::calculateOpticalFlow(int flow_enum)
 {
     if (flow_enum == LUCAS_KANADA) {
         vector<float> err;
@@ -146,7 +146,7 @@ void HumanTracker::calculateOpticalFlow(int flow_enum)
     }
 }
 
-void HumanTracker::filterAndDrawPoint()
+void AnomalyDetector::filterAndDrawPoint()
 {
     for(int i = 0; i < p1.size(); i++)
     {
@@ -170,7 +170,7 @@ void HumanTracker::filterAndDrawPoint()
             p0[i].pt = p1[i];
 }
 
-bool HumanTracker::showResult(bool stepByStep)
+bool AnomalyDetector::showResult(bool stepByStep)
 {
     add(newColorFrame, directionMask, newColorFrame);
     add(newColorFrame, lineMask, newColorFrame);
@@ -195,7 +195,7 @@ bool HumanTracker::showResult(bool stepByStep)
     return true;
 }
 
-void HumanTracker::setDetector(int detector_enum)
+void AnomalyDetector::setDetector(int detector_enum)
 {
     switch (detector_enum) {
     case GFTT_Detector: {
@@ -249,7 +249,7 @@ void HumanTracker::setDetector(int detector_enum)
     }
 }
 
-void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
+void AnomalyDetector::detectNewPoint(Mat &frame, int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -269,7 +269,7 @@ void HumanTracker::detectNewPoint(Mat &frame, int queue_index)
     putInfo("Total point amount " + std::to_string(p0.size()), 1);
 }
 
-void HumanTracker::fillPointMat(int blockSize)
+void AnomalyDetector::fillPointMat(int blockSize)
 {
     pointMat = Mat::zeros(oldFrame.size(), oldFrame.type());
     for (int i = 0; i < p0.size(); i++) {
@@ -277,7 +277,7 @@ void HumanTracker::fillPointMat(int blockSize)
     }
 }
 
-void HumanTracker::deleteStaticPoint(int queue_index)
+void AnomalyDetector::deleteStaticPoint(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -293,7 +293,7 @@ void HumanTracker::deleteStaticPoint(int queue_index)
     putInfo("Deleted static point " + std::to_string(count), 2);
 }
 
-void HumanTracker::putInfo(string text, int textY)
+void AnomalyDetector::putInfo(string text, int textY)
 {
     textY *= 50; // Order of labels from top to bottom
     Rect rect(10, textY - 40, info.cols, 50);
@@ -301,7 +301,7 @@ void HumanTracker::putInfo(string text, int textY)
     cv::putText(info, text, cv::Point(10, textY), cv::FONT_HERSHEY_DUPLEX, 1.0, Scalar(255), 2);
 }
 
-void HumanTracker::addPointToPath(int queue_index)
+void AnomalyDetector::addPointToPath(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -314,7 +314,7 @@ void HumanTracker::addPointToPath(int queue_index)
     showPathInfo(2);
 }
 
-void HumanTracker::drawPointPath()
+void AnomalyDetector::drawPointPath()
 {
     if (!showPath)
         return;
@@ -332,7 +332,7 @@ void HumanTracker::drawPointPath()
     }
 }
 
-void HumanTracker::approximatePath()
+void AnomalyDetector::approximatePath()
 {
     if (showApproximatedPath)
         lineMask = Mat::zeros(newColorFrame.size(), newColorFrame.type());
@@ -374,7 +374,7 @@ void HumanTracker::approximatePath()
     usfullPointCount++;
 }
 
-void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
+void AnomalyDetector::drawDirection(vector<Point2f> &apx, int index)
 {
     if (apx.size() < 2)
         return;
@@ -406,7 +406,7 @@ void HumanTracker::drawDirection(vector<Point2f> &apx, int index)
         arrowedLine(directionMask, apx[apx.size() - 1], pointDirection, dirColor, 1);
 }
 
-void HumanTracker::fillHSV2BGR()
+void AnomalyDetector::fillHSV2BGR()
 {
     for (int i = 0; i < 180; i++) {
         Mat bgr;
@@ -416,7 +416,7 @@ void HumanTracker::fillHSV2BGR()
     }
 }
 
-void HumanTracker::fillAngleToShift()
+void AnomalyDetector::fillAngleToShift()
 {
     angleToShift.resize(360);
     for (int i = 0; i < angleToShift.size(); ++i)
@@ -427,7 +427,7 @@ void HumanTracker::fillAngleToShift()
             }
 }
 
-void HumanTracker::fillCoordinateToPatchID()
+void AnomalyDetector::fillCoordinateToPatchID()
 {
     int patchWidth = coordinateToPatchID.cols / xPatchDim;
     int patchHeight = coordinateToPatchID.rows / yPatchDim;
@@ -439,7 +439,7 @@ void HumanTracker::fillCoordinateToPatchID()
                       Scalar(j * xPatchDim + i), -1);
 }
 
-void HumanTracker::fillGridMask()
+void AnomalyDetector::fillGridMask()
 {
     int xStep = gridMask.cols / xPatchDim;
     int yStep = gridMask.rows / yPatchDim;
@@ -457,7 +457,7 @@ void HumanTracker::fillGridMask()
     }
 }
 
-void HumanTracker::fillPatches()
+void AnomalyDetector::fillPatches()
 {
     for (int i = 0; i < xPatchDim * yPatchDim; ++i) {
         int xIndex = i % xPatchDim;
@@ -470,7 +470,7 @@ void HumanTracker::fillPatches()
     }
 }
 
-void HumanTracker::fillGroundTruthTXT(string filename)
+void AnomalyDetector::fillGroundTruthTXT(string filename)
 {
     size_t found = filename.find_last_of(".");
     filename.erase(found + 1, filename.size());
@@ -486,7 +486,7 @@ void HumanTracker::fillGroundTruthTXT(string filename)
         groundTruth[i] = static_cast<int>(str[i]) - 48;
 }
 
-void HumanTracker::fillGroundTruthIMG(string filename)
+void AnomalyDetector::fillGroundTruthIMG(string filename)
 {
     size_t found = filename.find_last_of("/");
     string cap = filename.substr(0, found) + "_gt/%03d.bmp";
@@ -511,7 +511,7 @@ void HumanTracker::fillGroundTruthIMG(string filename)
     }
 }
 
-void HumanTracker::exportProbToFile(string output)
+void AnomalyDetector::exportProbToFile(string output)
 {
     normalize(prob, prob, 1, 0, NORM_MINMAX);
     ofstream fout(output, std::ios::app);
@@ -522,7 +522,7 @@ void HumanTracker::exportProbToFile(string output)
     fout.close();
 }
 
-void HumanTracker::exportGtToFile(string output)
+void AnomalyDetector::exportGtToFile(string output)
 {
     ofstream fout(output, std::ios::app);
     for (int i = 0; i < truth.size(); ++i)
@@ -530,7 +530,7 @@ void HumanTracker::exportGtToFile(string output)
     fout.close();
 }
 
-Scalar HumanTracker::cvtAngleToBGR(int angle)
+Scalar AnomalyDetector::cvtAngleToBGR(int angle)
 {
     if (angle > 360 || angle < 0)
         return Scalar(0, 0, 0);
@@ -543,7 +543,7 @@ Scalar HumanTracker::cvtAngleToBGR(int angle)
         return angleToBGR[index];
 }
 
-void HumanTracker::mergePointToObject(int queue_index, int chanels)
+void AnomalyDetector::mergePointToObject(int queue_index, int chanels)
 {
     if (!showMergePoint)
         return;
@@ -588,7 +588,7 @@ void HumanTracker::mergePointToObject(int queue_index, int chanels)
     cvtColor(mergeMaskHSV, mergeMask, COLOR_HSV2BGR);
 }
 
-void HumanTracker::collectPathInfo(int index)
+void AnomalyDetector::collectPathInfo(int index)
 {
     if (!p0[index].dirColor)
         return;
@@ -597,7 +597,7 @@ void HumanTracker::collectPathInfo(int index)
     deletedGoodPathAmount++;
 }
 
-void HumanTracker::showPathInfo(int queue_index)
+void AnomalyDetector::showPathInfo(int queue_index)
 {
     if (queueCount != queue_index || deletedGoodPathAmount == 0)
         return;
@@ -605,7 +605,7 @@ void HumanTracker::showPathInfo(int queue_index)
     putInfo("Average path life time " + std::to_string(averagePathLifeTime), 4);
 }
 
-void HumanTracker::trajectoryAnalysis(int queue_index)
+void AnomalyDetector::trajectoryAnalysis(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -617,7 +617,7 @@ void HumanTracker::trajectoryAnalysis(int queue_index)
     showPatchComm(queue_index);
 }
 
-void HumanTracker::updateHOT(int queue_index)
+void AnomalyDetector::updateHOT(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -660,7 +660,7 @@ void HumanTracker::updateHOT(int queue_index)
     }
 }
 
-void HumanTracker::calcPatchHOT(int queue_index)
+void AnomalyDetector::calcPatchHOT(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -688,7 +688,7 @@ void HumanTracker::calcPatchHOT(int queue_index)
     }
 }
 
-void HumanTracker::calcPatchCommotion(int queue_index)
+void AnomalyDetector::calcPatchCommotion(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -713,7 +713,7 @@ void HumanTracker::calcPatchCommotion(int queue_index)
     commSum > commFrameTresh ? anomaly = true : anomaly = false;
 }
 
-void HumanTracker::showPatchGist(int queue_index)
+void AnomalyDetector::showPatchGist(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -775,7 +775,7 @@ void HumanTracker::showPatchGist(int queue_index)
     imshow("patchGist", patchGist);
 }
 
-void HumanTracker::showPatchComm(int queue_index)
+void AnomalyDetector::showPatchComm(int queue_index)
 {
     if (queueCount != queue_index)
         return;
@@ -800,7 +800,7 @@ void HumanTracker::showPatchComm(int queue_index)
     imshow("patchCommMaskShow", patchCommMaskShow);
 }
 
-void HumanTracker::patchInit(int index)
+void AnomalyDetector::patchInit(int index)
 {
     if (!predictPatchLBT)
         return;
@@ -849,7 +849,7 @@ void HumanTracker::patchInit(int index)
     patches.at(index).isEmpty = false;
 }
 
-void HumanTracker::printInfo()
+void AnomalyDetector::printInfo()
 {
     int avgPathLifeTime = goodPathLifeTimeSum / deletedGoodPathAmount;
     int avgPointAmount = usfullPointAmount / usfullPointCount;
@@ -860,7 +860,7 @@ void HumanTracker::printInfo()
     cout << "Average FPS = " << avgFPS << endl;
 }
 
-void HumanTracker::addAnomalyTitle(Mat &img)
+void AnomalyDetector::addAnomalyTitle(Mat &img)
 {
     Rect rect(10, 10, 180, 30);
     Scalar color = anomaly ? Scalar(0, 0, 255) : Scalar(0, 255, 0);

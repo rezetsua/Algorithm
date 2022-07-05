@@ -1,15 +1,15 @@
-#include "tracker.h"
+#include "anomaly_detector.h"
 
 int main()
 {
-    HumanTracker tracker("/home/urii/Документы/DataSet/23scene.mp4", Flow::LUCAS_KANADA,
+    AnomalyDetector detector("/home/urii/Документы/DataSet/UMN/123scene.avi", Flow::LUCAS_KANADA,
                          Detectors::GFTT_Detector, CaptureMode::VIDEO_CAPTURE);
 
-    tracker.startTracking();
+    detector.startAnalysis();
 
     // If the algorithm was given a GT
-    tracker.exportProbToFile("/home/urii/Документы/DataSet/123sceneProb.txt");
-    tracker.exportGtToFile("/home/urii/Документы/DataSet/123sceneGT.txt");
+    detector.exportProbToFile("/home/urii/Документы/DataSet/UMN/123scene.txt");
+    detector.exportGtToFile("/home/urii/Документы/DataSet/UMN/123scene.txt");
 
     return 0;
 }
