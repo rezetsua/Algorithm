@@ -52,7 +52,4 @@ The algorithm settings are at the top in .h file. If you will use one of the ped
 1b61b0750cdf4e88d92c2971963ae093fdb4f952 - ped2
 004c22ccc86403a91441df1c14bd336551335b2a - UMN
 ```
-```diff
-- Attention!
-```
-Do not checkout these commits, but only get the parameter values, otherwise you will return to the old version of the algorithm, which may look/work different.
+**Attention!** Do not checkout these commits, but only get the parameter values, otherwise you will return to the old version of the algorithm, which may look/work different.
