@@ -1,5 +1,5 @@
-#ifndef HUMANTRACKER_H
-#define HUMANTRACKER_H
+#ifndef ANOMALYDETECTOR_H
+#define ANOMALYDETECTOR_H
 
 #define OPENCV_TRAITS_ENABLE_DEPRECATED
 
@@ -125,14 +125,14 @@ public:
     vector<double> indexToMagnitude;
 };
 
-class HumanTracker
+class AnomalyDetector
 {
 public:
-    HumanTracker(const string& filename, int flow = LUCAS_KANADA, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
+    AnomalyDetector(const string& filename, int flow = LUCAS_KANADA, int detector = GFTT_Detector, int captureMode = VIDEO_CAPTURE);
 
 public:
-    void startTracking();
-    void stopTracking();
+    void startAnalysis();
+    void stopAnalysis();
     void exportProbToFile(string output);
     void exportGtToFile(string output);
 
@@ -219,4 +219,4 @@ private:
     long long usfullPointCount = 0;
 };
 
-#endif // HUMANTRACKER_H
+#endif // ANOMALYDETECTOR_H
